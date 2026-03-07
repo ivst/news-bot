@@ -4,6 +4,8 @@ import html
 import logging
 import re
 import time
+import unicodedata
+from difflib import SequenceMatcher
 from datetime import timezone
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -41,6 +43,39 @@ def _normalize_summary(summary: str) -> str:
     for ln in lines:
         normalized.append(ln if ln.startswith("• ") else f"• {ln.lstrip('•').strip()}")
     return "\n".join(normalized[:2])
+
+
+def _text_norm_for_similarity(title: str, summary: str) -> str:
+    text = f"{title} {summary}".lower()
+    text = unicodedata.normalize("NFKC", text)
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"[^0-9a-zа-яё\s]", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _similarity_ratio(a: str, b: str) -> float:
+    if not a or not b:
+        return 0.0
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def _find_similar_recent(
+    store: SeenNewsStore,
+    *,
+    channel: str,
+    text_norm: str,
+    window: int,
+    threshold: float,
+) -> tuple[bool, float, str | None]:
+    best_score = 0.0
+    best_link = None
+    for old_text_norm, old_link in store.get_recent_published_texts(channel, window):
+        score = _similarity_ratio(text_norm, old_text_norm)
+        if score > best_score:
+            best_score = score
+            best_link = old_link
+    return best_score >= threshold, best_score, best_link
 
 
 def build_telegram_message(title: str, summary: str, link: str) -> str:
@@ -117,6 +152,16 @@ def job() -> None:
         )
         if not translated:
             logger.warning("Skipped (translation failed for body): %s", item.link)
+            for channel_name, _ in channels:
+                store.record_attempt(
+                    channel=channel_name,
+                    link=item.link,
+                    title=item.title,
+                    summary="",
+                    text_norm="",
+                    status="rejected_translation_failed",
+                    reason="body_translation_failed",
+                )
             continue
         translated = strip_ui_noise(translated)
         summary = summarize_text(
@@ -138,6 +183,16 @@ def job() -> None:
         )
         if not title:
             logger.warning("Skipped (translation failed for title): %s", item.link)
+            for channel_name, _ in channels:
+                store.record_attempt(
+                    channel=channel_name,
+                    link=item.link,
+                    title=item.title,
+                    summary=summary,
+                    text_norm="",
+                    status="rejected_translation_failed",
+                    reason="title_translation_failed",
+                )
             continue
         title = _normalize_title(strip_ui_noise(title))
         publish_link = item.link
@@ -146,11 +201,41 @@ def job() -> None:
         summary = _normalize_summary(summary)
         tg_message = strip_ui_noise(build_telegram_message(title, summary, item.link))
         vk_message = strip_ui_noise(build_vk_message(title, summary))
+        text_norm = _text_norm_for_similarity(title, summary)
 
         item_has_success = False
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
         for channel_name, publisher in channels:
             try:
+                if settings.similar_dedup_enabled:
+                    is_similar, score, match_link = _find_similar_recent(
+                        store,
+                        channel=channel_name,
+                        text_norm=text_norm,
+                        window=settings.similar_dedup_window,
+                        threshold=settings.similar_dedup_threshold,
+                    )
+                    if is_similar:
+                        logger.info(
+                            "Rejected as similar for %s: %s (score=%.3f, matched=%s)",
+                            channel_name,
+                            item.link,
+                            score,
+                            match_link or "-",
+                        )
+                        store.record_attempt(
+                            channel=channel_name,
+                            link=item.link,
+                            title=title,
+                            summary=summary,
+                            text_norm=text_norm,
+                            status="rejected_similar",
+                            reason=f"matched:{match_link or ''}",
+                            similarity=score,
+                        )
+                        store.mark_seen(channel_name, item.link, published_at)
+                        continue
+
                 if channel_name == "vk":
                     publisher.publish(
                         vk_message,
@@ -161,12 +246,29 @@ def job() -> None:
                 else:
                     publisher.publish(tg_message)
                 store.mark_seen(channel_name, item.link, published_at)
+                store.record_attempt(
+                    channel=channel_name,
+                    link=item.link,
+                    title=title,
+                    summary=summary,
+                    text_norm=text_norm,
+                    status="published",
+                )
                 published_posts += 1
                 item_has_success = True
                 logger.info("Published to %s: %s", channel_name, item.link)
                 time.sleep(1)
             except Exception as ex:
                 logger.exception("Publish failed for %s (%s): %s", item.link, channel_name, ex)
+                store.record_attempt(
+                    channel=channel_name,
+                    link=item.link,
+                    title=title,
+                    summary=summary,
+                    text_norm=text_norm,
+                    status="publish_failed",
+                    reason=str(ex)[:500],
+                )
 
         if item_has_success:
             published_items += 1

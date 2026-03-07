@@ -74,6 +74,9 @@ Copy `.env.example` to `.env` and fill in:
 - `SHORTENER_PROVIDER=isgd` or `tinyurl`.
 - `DEDUP_CLEANUP_ENABLED=true` - auto-clean dedup records on each run.
 - `DEDUP_RETENTION_DAYS=90` - keep dedup records for the last N days.
+- `SIMILAR_DEDUP_ENABLED=true` - reject very similar recent posts.
+- `SIMILAR_DEDUP_WINDOW=15` - compare against the last N published posts per channel.
+- `SIMILAR_DEDUP_THRESHOLD=0.90` - similarity threshold (0..1).
 
 ### LLM (OpenAI or DeepSeek)
 - `LLM_API_KEY` - provider API key.
@@ -124,3 +127,13 @@ APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts
 - If you publish only to one platform, fill only the corresponding variables.
 - Published links database: `data/news.db`.
 - If `RSS_URLS` is empty, the service will not publish anything.
+
+### Check publish/reject history
+```bash
+sqlite3 /opt/news-bot/data/news.db "SELECT channel,status,similarity,substr(title,1,90),created_at FROM post_attempts ORDER BY id DESC LIMIT 30;"
+```
+
+Only rejected similar:
+```bash
+sqlite3 /opt/news-bot/data/news.db "SELECT channel,similarity,link,created_at FROM post_attempts WHERE status='rejected_similar' ORDER BY id DESC LIMIT 30;"
+```

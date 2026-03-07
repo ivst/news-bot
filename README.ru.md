@@ -74,6 +74,9 @@ docker compose logs -f
 - `SHORTENER_PROVIDER=isgd` или `tinyurl`.
 - `DEDUP_CLEANUP_ENABLED=true` - автоочистка дедуп-записей на каждом запуске.
 - `DEDUP_RETENTION_DAYS=90` - хранить дедуп-записи за последние N дней.
+- `SIMILAR_DEDUP_ENABLED=true` - отклонять слишком похожие недавние посты.
+- `SIMILAR_DEDUP_WINDOW=15` - сравнивать с последними N опубликованными постами по каналу.
+- `SIMILAR_DEDUP_THRESHOLD=0.90` - порог похожести (0..1).
 
 ### LLM (OpenAI или DeepSeek)
 - `LLM_API_KEY` - ключ провайдера.
@@ -124,3 +127,13 @@ APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts
 - Для публикации только в одну платформу можно заполнить только соответствующие переменные.
 - База опубликованных ссылок: `data/news.db`.
 - При пустом `RSS_URLS` сервис ничего не публикует.
+
+### Как проверить историю публикаций/отказов
+```bash
+sqlite3 /opt/news-bot/data/news.db "SELECT channel,status,similarity,substr(title,1,90),created_at FROM post_attempts ORDER BY id DESC LIMIT 30;"
+```
+
+Только отказы из-за похожести:
+```bash
+sqlite3 /opt/news-bot/data/news.db "SELECT channel,similarity,link,created_at FROM post_attempts WHERE status='rejected_similar' ORDER BY id DESC LIMIT 30;"
+```

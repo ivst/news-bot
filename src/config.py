@@ -32,6 +32,9 @@ class Settings:
     shortener_provider: str
     dedup_cleanup_enabled: bool
     dedup_retention_days: int
+    similar_dedup_enabled: bool
+    similar_dedup_window: int
+    similar_dedup_threshold: float
 
 
 def _to_bool(value: str | None, default: bool = False) -> bool:
@@ -74,4 +77,7 @@ def load_settings() -> Settings:
         shortener_provider=os.getenv("SHORTENER_PROVIDER", "isgd").strip().lower(),
         dedup_cleanup_enabled=_to_bool(os.getenv("DEDUP_CLEANUP_ENABLED"), default=True),
         dedup_retention_days=max(1, int(os.getenv("DEDUP_RETENTION_DAYS", "90"))),
+        similar_dedup_enabled=_to_bool(os.getenv("SIMILAR_DEDUP_ENABLED"), default=True),
+        similar_dedup_window=max(1, int(os.getenv("SIMILAR_DEDUP_WINDOW", "15"))),
+        similar_dedup_threshold=min(1.0, max(0.0, float(os.getenv("SIMILAR_DEDUP_THRESHOLD", "0.90")))),
     )
