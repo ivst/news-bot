@@ -53,8 +53,8 @@ def build_telegram_message(title: str, summary: str, link: str) -> str:
     return msg
 
 
-def build_vk_message(title: str, summary: str, link: str) -> str:
-    msg = f"{title}\n\n{summary}\n\nИсточник: {link}"
+def build_vk_message(title: str, summary: str) -> str:
+    msg = f"{title}\n\n{summary}\n\nИсточник"
     if len(msg) > 3900:
         msg = msg[:3890].rsplit(" ", 1)[0] + "..."
     return msg
@@ -141,14 +141,14 @@ def job() -> None:
             publish_link = shorten_url(item.link, settings.shortener_provider)
         summary = _normalize_summary(summary)
         tg_message = strip_ui_noise(build_telegram_message(title, summary, item.link))
-        vk_message = strip_ui_noise(build_vk_message(title, summary, publish_link))
+        vk_message = strip_ui_noise(build_vk_message(title, summary))
 
         item_has_success = False
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
         for channel_name, publisher in channels:
             try:
                 if channel_name == "vk":
-                    publisher.publish(vk_message, attachment_link=item.link)
+                    publisher.publish(vk_message, attachment_link=item.link, source_link=publish_link)
                 else:
                     publisher.publish(tg_message)
                 store.mark_seen(channel_name, item.link, published_at)

@@ -25,7 +25,9 @@ class VKPublisher:
         msg = str(err.get("error_msg") or "")
         return code if isinstance(code, int) else None, msg
 
-    def publish(self, message: str, attachment_link: Optional[str] = None) -> None:
+    def publish(
+        self, message: str, attachment_link: Optional[str] = None, source_link: Optional[str] = None
+    ) -> None:
         if not self.enabled:
             return
 
@@ -47,6 +49,8 @@ class VKPublisher:
             if payload.get("attachments") and code == 100 and "link_photo_sizing_rule" in msg:
                 fallback_payload = dict(payload)
                 fallback_payload.pop("attachments", None)
+                if source_link:
+                    fallback_payload["message"] = f"{message}\n\nИсточник: {source_link}"
                 fallback_resp = requests.post(
                     "https://api.vk.com/method/wall.post", data=fallback_payload, timeout=30
                 )

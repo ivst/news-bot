@@ -69,7 +69,7 @@ docker compose logs -f
 - `TARGET_LANGUAGE=ru` или другой код языка.
 - `SCHEDULE_CRON` в формате cron (по умолчанию каждые 30 минут).
 - `NEWS_MAX_AGE_DAYS=1` - учитывать только новости не старше N дней.
-- `SHORT_LINKS_ENABLED=true` - сокращать ссылку перед публикацией.
+- `SHORT_LINKS_ENABLED=false` - сокращать ссылку перед публикацией.
 - `SHORTENER_PROVIDER=isgd` или `tinyurl`.
 - `DEDUP_CLEANUP_ENABLED=true` - автоочистка дедуп-записей на каждом запуске.
 - `DEDUP_RETENTION_DAYS=90` - хранить дедуп-записи за последние N дней.
