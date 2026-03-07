@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import re
 from typing import Optional
+from urllib.parse import urljoin
 
 import requests
+from bs4 import BeautifulSoup
 
 
 class VKPublisher:
@@ -57,7 +59,11 @@ class VKPublisher:
         if not upload_url:
             return None
 
-        image_resp = requests.get(image_url, timeout=30)
+        image_resp = requests.get(
+            image_url,
+            timeout=30,
+            headers={"User-Agent": "Mozilla/5.0 (news-bot)"},
+        )
         image_resp.raise_for_status()
         content_type = image_resp.headers.get("Content-Type", "image/jpeg")
         files = {"photo": ("news.jpg", image_resp.content, content_type)}
@@ -85,6 +91,41 @@ class VKPublisher:
             return None
         return f"photo{owner_id}_{photo_id}"
 
+    @staticmethod
+    def _extract_image_from_html(page_url: str, html_text: str) -> Optional[str]:
+        soup = BeautifulSoup(html_text, "html.parser")
+        for selector, attr in [
+            ("meta[property='og:image']", "content"),
+            ("meta[name='og:image']", "content"),
+            ("meta[name='twitter:image']", "content"),
+            ("meta[property='twitter:image']", "content"),
+        ]:
+            tag = soup.select_one(selector)
+            if tag and tag.get(attr):
+                return urljoin(page_url, str(tag.get(attr)).strip())
+        img = soup.find("img")
+        if img and img.get("src"):
+            return urljoin(page_url, str(img.get("src")).strip())
+        return None
+
+    def _discover_image_url(self, image_url: Optional[str], article_url: Optional[str]) -> Optional[str]:
+        if image_url:
+            return image_url
+        if not article_url:
+            return None
+        try:
+            page_resp = requests.get(
+                article_url,
+                timeout=30,
+                allow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0 (news-bot)"},
+            )
+            page_resp.raise_for_status()
+            final_url = page_resp.url or article_url
+            return self._extract_image_from_html(final_url, page_resp.text)
+        except Exception:
+            return None
+
     def _wall_post(self, payload: dict) -> dict:
         resp = requests.post(f"{self.API_BASE}/wall.post", data=payload, timeout=30)
         resp.raise_for_status()
@@ -100,10 +141,11 @@ class VKPublisher:
         if not self.enabled:
             return
 
+        discovered_image = self._discover_image_url(image_url, attachment_link or source_link)
         photo_attachment = None
-        if image_url:
+        if discovered_image:
             try:
-                photo_attachment = self._upload_wall_photo(image_url)
+                photo_attachment = self._upload_wall_photo(discovered_image)
             except Exception:
                 photo_attachment = None
 
