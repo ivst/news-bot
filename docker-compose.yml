@@ -1,0 +1,10 @@
+services:
+  news-bot:
+    build: .
+    container_name: news-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    command: ["python", "main.py"]
