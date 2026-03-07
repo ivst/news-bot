@@ -74,6 +74,7 @@ Copy `.env.example` to `.env` and fill in:
 - `SHORTENER_PROVIDER=isgd` or `tinyurl`.
 - `DEDUP_CLEANUP_ENABLED=true` - auto-clean dedup records on each run.
 - `DEDUP_RETENTION_DAYS=90` - keep dedup records for the last N days.
+- `POST_ATTEMPTS_RETENTION_DAYS=30` - keep publish/reject attempts for the last N days.
 - `SIMILAR_DEDUP_ENABLED=true` - reject very similar recent posts.
 - `SIMILAR_DEDUP_WINDOW=15` - compare against the last N published posts per channel.
 - `SIMILAR_DEDUP_THRESHOLD=0.90` - similarity threshold (0..1).

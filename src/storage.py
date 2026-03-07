@@ -97,6 +97,17 @@ class SeenNewsStore:
             conn.commit()
         return deleted
 
+    def cleanup_attempts_older_than_days(self, retention_days: int) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).isoformat()
+        with self._connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM post_attempts WHERE created_at < ?",
+                (cutoff,),
+            )
+            deleted = cur.rowcount if cur.rowcount is not None else 0
+            conn.commit()
+        return deleted
+
     def vacuum(self) -> None:
         with self._connect() as conn:
             conn.execute("VACUUM")

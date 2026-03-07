@@ -74,6 +74,7 @@ docker compose logs -f
 - `SHORTENER_PROVIDER=isgd` или `tinyurl`.
 - `DEDUP_CLEANUP_ENABLED=true` - автоочистка дедуп-записей на каждом запуске.
 - `DEDUP_RETENTION_DAYS=90` - хранить дедуп-записи за последние N дней.
+- `POST_ATTEMPTS_RETENTION_DAYS=30` - хранить историю попыток публикации/отказов за последние N дней.
 - `SIMILAR_DEDUP_ENABLED=true` - отклонять слишком похожие недавние посты.
 - `SIMILAR_DEDUP_WINDOW=15` - сравнивать с последними N опубликованными постами по каналу.
 - `SIMILAR_DEDUP_THRESHOLD=0.90` - порог похожести (0..1).

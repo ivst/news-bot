@@ -104,13 +104,21 @@ def job() -> None:
 
     store = SeenNewsStore(settings.database_path)
     if settings.dedup_cleanup_enabled:
-        deleted = store.cleanup_older_than_days(settings.dedup_retention_days)
-        if deleted > 0:
+        deleted_links = store.cleanup_older_than_days(settings.dedup_retention_days)
+        deleted_attempts = store.cleanup_attempts_older_than_days(settings.post_attempts_retention_days)
+        if deleted_links > 0:
             logger.info(
                 "Dedup cleanup removed %s row(s) older than %s day(s)",
-                deleted,
+                deleted_links,
                 settings.dedup_retention_days,
             )
+        if deleted_attempts > 0:
+            logger.info(
+                "Attempts cleanup removed %s row(s) older than %s day(s)",
+                deleted_attempts,
+                settings.post_attempts_retention_days,
+            )
+        if deleted_links > 0 or deleted_attempts > 0:
             store.vacuum()
     tg = TelegramPublisher(settings.telegram_bot_token, settings.telegram_chat_id)
     vk = VKPublisher(
