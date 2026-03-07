@@ -45,13 +45,26 @@ def _normalize_summary(summary: str) -> str:
     return "\n".join(normalized[:2])
 
 
-def _text_norm_for_similarity(title: str, summary: str) -> str:
-    text = f"{title} {summary}".lower()
+def _normalize_for_similarity(text: str) -> str:
+    text = text.lower()
     text = unicodedata.normalize("NFKC", text)
     text = re.sub(r"https?://\S+", " ", text)
     text = re.sub(r"[^0-9a-zа-яё\s]", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+
+def _text_norm_for_similarity(title: str, summary: str) -> str:
+    title_norm = _normalize_for_similarity(title)
+    summary_norm = _normalize_for_similarity(summary)
+
+    # Use summary as the primary semantic signal. Headline rewrites are noisy
+    # and can hide duplicates when compared together with the summary.
+    if summary_norm and len(summary_norm.split()) >= 8:
+        return summary_norm
+    if summary_norm and title_norm:
+        return f"{summary_norm} {title_norm}"
+    return summary_norm or title_norm
 
 
 def _similarity_ratio(a: str, b: str) -> float:
