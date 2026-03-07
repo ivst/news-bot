@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 import requests
@@ -24,6 +25,12 @@ class VKPublisher:
         code = err.get("error_code")
         msg = str(err.get("error_msg") or "")
         return code if isinstance(code, int) else None, msg
+
+    @staticmethod
+    def _inject_source_link(message: str, source_link: str) -> str:
+        # Replace trailing "Источник" marker instead of appending a duplicate line.
+        out = re.sub(r"(?:\n\s*)?Источник\s*$", "", message.strip(), flags=re.IGNORECASE).strip()
+        return f"{out}\n\nИсточник: {source_link}"
 
     def publish(
         self, message: str, attachment_link: Optional[str] = None, source_link: Optional[str] = None
@@ -50,7 +57,7 @@ class VKPublisher:
                 fallback_payload = dict(payload)
                 fallback_payload.pop("attachments", None)
                 if source_link:
-                    fallback_payload["message"] = f"{message}\n\nИсточник: {source_link}"
+                    fallback_payload["message"] = self._inject_source_link(message, source_link)
                 fallback_resp = requests.post(
                     "https://api.vk.com/method/wall.post", data=fallback_payload, timeout=30
                 )
