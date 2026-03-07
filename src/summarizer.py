@@ -10,7 +10,7 @@ def _simple_summary(text: str, max_chars: int = 420) -> str:
     if not normalized:
         return ""
     if len(normalized) > max_chars:
-        normalized = normalized[:max_chars].rsplit(" ", 1)[0] + "..."
+        normalized = normalized[:max_chars].rsplit(" ", 1)[0]
     parts = [p.strip() for p in normalized.split(".") if p.strip()]
     if not parts:
         return normalized

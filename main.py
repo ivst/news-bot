@@ -26,12 +26,10 @@ logging.basicConfig(
 logger = logging.getLogger("news-bot")
 
 
-def _normalize_title(title: str, max_len: int = 110) -> str:
+def _normalize_title(title: str) -> str:
     out = " ".join(title.split())
     # Remove common publisher tails from translated headlines.
     out = re.sub(r"\s*[—\-|:]\s*(livedoor news|yahoo!ニュース|bing news|google news)\s*$", "", out, flags=re.IGNORECASE)
-    if len(out) > max_len:
-        out = out[:max_len].rsplit(" ", 1)[0] + "..."
     return out
 
 
