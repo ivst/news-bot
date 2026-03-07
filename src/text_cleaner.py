@@ -22,7 +22,14 @@ def strip_ui_noise(text: str) -> str:
     for pattern in _NOISE_PATTERNS:
         cleaned = re.sub(pattern, " ", cleaned, flags=re.IGNORECASE)
 
-    # Normalize separator leftovers after phrase removal.
-    cleaned = re.sub(r"\s{2,}", " ", cleaned)
-    cleaned = re.sub(r"\s+([,.;:!?])", r"\1", cleaned)
-    return cleaned.strip(" -|,.;:!?")
+    # Keep line breaks for platform-specific formatting.
+    cleaned = cleaned.replace("\r\n", "\n").replace("\r", "\n")
+    lines = []
+    for line in cleaned.split("\n"):
+        normalized = re.sub(r"[ \t]{2,}", " ", line)
+        normalized = re.sub(r"[ \t]+([,.;:!?])", r"\1", normalized)
+        lines.append(normalized.strip())
+
+    cleaned = "\n".join(lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
