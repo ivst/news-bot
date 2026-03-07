@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
+import logging
 import re
+from io import BytesIO
 from typing import Optional
 from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
+from PIL import Image
+
+logger = logging.getLogger("news-bot.vk")
 
 
 class VKPublisher:
@@ -43,7 +49,27 @@ class VKPublisher:
             raise RuntimeError(f"VK API error: {body['error']}")
         return body.get("response") or {}
 
-    def _upload_wall_photo(self, image_url: str) -> Optional[str]:
+    @staticmethod
+    def _to_jpeg_if_needed(image_bytes: bytes, content_type: str, image_url: str) -> tuple[bytes, str]:
+        lower_ct = (content_type or "").lower()
+        lower_url = image_url.lower()
+        needs_convert = (
+            "image/webp" in lower_ct
+            or "image/avif" in lower_ct
+            or "image/svg" in lower_ct
+            or lower_url.endswith(".webp")
+            or lower_url.endswith(".avif")
+            or lower_url.endswith(".svg")
+        )
+        if not needs_convert:
+            return image_bytes, content_type or "image/jpeg"
+
+        img = Image.open(BytesIO(image_bytes)).convert("RGB")
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=90, optimize=True)
+        return out.getvalue(), "image/jpeg"
+
+    def _upload_wall_photo(self, image_url: str, source_link: Optional[str] = None) -> Optional[str]:
         if not image_url:
             return None
 
@@ -59,14 +85,22 @@ class VKPublisher:
         if not upload_url:
             return None
 
-        image_resp = requests.get(
-            image_url,
-            timeout=30,
-            headers={"User-Agent": "Mozilla/5.0 (news-bot)"},
-        )
+        headers = {"User-Agent": "Mozilla/5.0 (news-bot)"}
+        image_resp = requests.get(image_url, timeout=30, headers=headers)
+        if image_resp.status_code >= 400 and source_link:
+            headers["Referer"] = source_link
+            image_resp = requests.get(image_url, timeout=30, headers=headers)
         image_resp.raise_for_status()
-        content_type = image_resp.headers.get("Content-Type", "image/jpeg")
-        files = {"photo": ("news.jpg", image_resp.content, content_type)}
+
+        raw_bytes = image_resp.content
+        raw_type = image_resp.headers.get("Content-Type", "image/jpeg")
+        try:
+            upload_bytes, upload_type = self._to_jpeg_if_needed(raw_bytes, raw_type, image_url)
+        except Exception as ex:
+            logger.warning("VK image convert failed, using original bytes for %s: %s", image_url, ex)
+            upload_bytes, upload_type = raw_bytes, raw_type
+
+        files = {"photo": ("news.jpg", upload_bytes, upload_type)}
         upload_resp = requests.post(upload_url, files=files, timeout=60)
         upload_resp.raise_for_status()
         upload_body = upload_resp.json()
@@ -106,6 +140,35 @@ class VKPublisher:
         img = soup.find("img")
         if img and img.get("src"):
             return urljoin(page_url, str(img.get("src")).strip())
+
+        # JSON-LD fallback: "image" can be string/list/object
+        for script in soup.select("script[type='application/ld+json']"):
+            raw = script.get_text(strip=True)
+            if not raw:
+                continue
+            try:
+                data = json.loads(raw)
+            except Exception:
+                continue
+
+            def pick(obj) -> Optional[str]:
+                if isinstance(obj, str):
+                    return urljoin(page_url, obj.strip())
+                if isinstance(obj, list):
+                    for it in obj:
+                        got = pick(it)
+                        if got:
+                            return got
+                    return None
+                if isinstance(obj, dict):
+                    if isinstance(obj.get("url"), str):
+                        return urljoin(page_url, obj["url"].strip())
+                    return pick(obj.get("image"))
+                return None
+
+            got = pick(data)
+            if got:
+                return got
         return None
 
     def _discover_image_url(self, image_url: Optional[str], article_url: Optional[str]) -> Optional[str]:
@@ -123,7 +186,8 @@ class VKPublisher:
             page_resp.raise_for_status()
             final_url = page_resp.url or article_url
             return self._extract_image_from_html(final_url, page_resp.text)
-        except Exception:
+        except Exception as ex:
+            logger.warning("VK image discovery failed for %s: %s", article_url, ex)
             return None
 
     def _wall_post(self, payload: dict) -> dict:
@@ -145,9 +209,12 @@ class VKPublisher:
         photo_attachment = None
         if discovered_image:
             try:
-                photo_attachment = self._upload_wall_photo(discovered_image)
-            except Exception:
+                photo_attachment = self._upload_wall_photo(discovered_image, source_link=source_link)
+            except Exception as ex:
+                logger.warning("VK photo upload failed for %s: %s", discovered_image, ex)
                 photo_attachment = None
+        else:
+            logger.info("VK image not found for post source: %s", source_link or attachment_link)
 
         attachments: list[str] = []
         if photo_attachment:
