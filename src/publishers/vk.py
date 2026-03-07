@@ -18,9 +18,11 @@ class VKPublisher:
     API_VERSION = "5.199"
     API_BASE = "https://api.vk.com/method"
 
-    def __init__(self, group_id: Optional[str], access_token: Optional[str]):
+    def __init__(self, group_id: Optional[str], access_token: Optional[str], photo_upload_enabled: bool = True):
         self.group_id = group_id
         self.access_token = access_token
+        self.photo_upload_enabled = photo_upload_enabled
+        self._photo_upload_disabled_by_auth = False
 
     @property
     def enabled(self) -> bool:
@@ -70,17 +72,30 @@ class VKPublisher:
         return out.getvalue(), "image/jpeg"
 
     def _upload_wall_photo(self, image_url: str, source_link: Optional[str] = None) -> Optional[str]:
-        if not image_url:
+        if not image_url or not self.photo_upload_enabled or self._photo_upload_disabled_by_auth:
             return None
 
-        upload_server = self._api_call(
-            "photos.getWallUploadServer",
-            {
-                "group_id": self.group_id,
-                "access_token": self.access_token,
-                "v": self.API_VERSION,
-            },
+        upload_server_payload = {
+            "group_id": self.group_id,
+            "access_token": self.access_token,
+            "v": self.API_VERSION,
+        }
+        upload_server_resp = requests.post(
+            f"{self.API_BASE}/photos.getWallUploadServer", data=upload_server_payload, timeout=30
         )
+        upload_server_resp.raise_for_status()
+        upload_server_body = upload_server_resp.json()
+        if "error" in upload_server_body:
+            code, msg = self._extract_error(upload_server_body)
+            if code == 27:
+                self._photo_upload_disabled_by_auth = True
+                logger.info(
+                    "VK photo upload disabled: group token does not support photos.getWallUploadServer. "
+                    "Set VK_PHOTO_UPLOAD_ENABLED=false or use user access token with photos scope."
+                )
+                return None
+            raise RuntimeError(f"VK API error: {upload_server_body['error']}")
+        upload_server = upload_server_body.get("response") or {}
         upload_url = str(upload_server.get("upload_url") or "")
         if not upload_url:
             return None

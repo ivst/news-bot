@@ -78,7 +78,11 @@ def job() -> None:
             )
             store.vacuum()
     tg = TelegramPublisher(settings.telegram_bot_token, settings.telegram_chat_id)
-    vk = VKPublisher(settings.vk_group_id, settings.vk_access_token)
+    vk = VKPublisher(
+        settings.vk_group_id,
+        settings.vk_access_token,
+        photo_upload_enabled=settings.vk_photo_upload_enabled,
+    )
 
     news = fetch_news(
         settings.rss_urls,

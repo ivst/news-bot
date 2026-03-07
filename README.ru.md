@@ -66,6 +66,7 @@ docker compose logs -f
 - `TARGET_TOPIC` - тема материалов (например `world news`, `AI`, `fintech`).
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` для Telegram.
 - `VK_GROUP_ID`, `VK_ACCESS_TOKEN` для VK.
+- `VK_PHOTO_UPLOAD_ENABLED=true` - загружать фото в VK через API (нужен user token с правом `photos`).
 - `TARGET_LANGUAGE=ru` или другой код языка.
 - `SCHEDULE_CRON` в формате cron (по умолчанию каждые 30 минут).
 - `NEWS_MAX_AGE_DAYS=1` - учитывать только новости не старше N дней.
