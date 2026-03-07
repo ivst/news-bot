@@ -86,6 +86,9 @@ def job() -> None:
             llm_base_url=settings.llm_base_url,
             use_llm_translation=settings.llm_translation_enabled,
         )
+        if not translated:
+            logger.warning("Skipped (translation failed for body): %s", item.link)
+            continue
         translated = strip_ui_noise(translated)
         summary = summarize_text(
             translated,
@@ -93,6 +96,7 @@ def job() -> None:
             llm_api_key=settings.llm_api_key,
             llm_model=settings.llm_model,
             llm_base_url=settings.llm_base_url,
+            prompt_template=settings.llm_summary_prompt,
         )
         summary = strip_ui_noise(summary)
         title = translate_text(
@@ -103,6 +107,9 @@ def job() -> None:
             llm_base_url=settings.llm_base_url,
             use_llm_translation=settings.llm_translation_enabled,
         )
+        if not title:
+            logger.warning("Skipped (translation failed for title): %s", item.link)
+            continue
         title = strip_ui_noise(title)
         publish_link = item.link
         if settings.short_links_enabled:

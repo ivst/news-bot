@@ -79,6 +79,7 @@ docker compose logs -f
 - `LLM_MODEL` - модель (например `gpt-4.1-mini` или `deepseek-chat`).
 - `LLM_BASE_URL` - базовый URL API.
 - `LLM_TRANSLATION_ENABLED=true` - включить перевод через LLM.
+- `LLM_SUMMARY_PROMPT` - кастомный шаблон промпта summary (поддерживает плейсхолдер `{target_language}`).
 
 Если `LLM_API_KEY` пустой, summary делается локальным fallback, а перевод - через `deep-translator`.
 
@@ -88,6 +89,7 @@ LLM_API_KEY=your_deepseek_key
 LLM_MODEL=deepseek-chat
 LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_TRANSLATION_ENABLED=true
+LLM_SUMMARY_PROMPT=You are an editor for Telegram and VK digest posts. Write in '{target_language}'. Return exactly 2 lines, each line starts with '• '.
 ```
 
 ## Запуск как systemd-сервис
