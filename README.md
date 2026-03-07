@@ -68,6 +68,7 @@ Copy `.env.example` to `.env` and fill in:
 - `VK_GROUP_ID`, `VK_ACCESS_TOKEN` for VK.
 - `TARGET_LANGUAGE=ru` or another language code.
 - `SCHEDULE_CRON` in cron format (default: every 30 minutes).
+- `NEWS_MAX_AGE_DAYS=1` - only consider news not older than N days.
 - `SHORT_LINKS_ENABLED=true` - shorten links before publishing.
 - `SHORTENER_PROVIDER=isgd` or `tinyurl`.
 - `DEDUP_CLEANUP_ENABLED=true` - auto-clean dedup records on each run.

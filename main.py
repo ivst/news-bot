@@ -55,7 +55,12 @@ def job() -> None:
     tg = TelegramPublisher(settings.telegram_bot_token, settings.telegram_chat_id)
     vk = VKPublisher(settings.vk_group_id, settings.vk_access_token)
 
-    news = fetch_news(settings.rss_urls, settings.target_topic, settings.max_news_per_run * 5)
+    news = fetch_news(
+        settings.rss_urls,
+        settings.target_topic,
+        settings.max_news_per_run * 5,
+        max_age_days=settings.news_max_age_days,
+    )
     logger.info("Fetched %s candidate news items", len(news))
 
     published_items = 0

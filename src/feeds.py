@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import html
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import List
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -68,14 +68,19 @@ def _normalize_link(link: str) -> str:
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path, normalized_query, ""))
 
 
-def fetch_news(rss_urls: List[str], topic: str, limit: int) -> List[NewsItem]:
+def fetch_news(rss_urls: List[str], topic: str, limit: int, max_age_days: int = 1) -> List[NewsItem]:
     topic_lower = topic.lower()
     collected: List[NewsItem] = []
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=max(1, max_age_days))
 
     for url in rss_urls:
         feed = feedparser.parse(url)
         source = feed.feed.get("title", "Unknown source")
         for entry in feed.entries:
+            published_at = _to_datetime(entry)
+            if published_at < cutoff:
+                continue
+
             title = (entry.get("title") or "").strip()
             summary = _extract_text(entry.get("summary") or "")
             link = _normalize_link(entry.get("link") or "")
@@ -91,7 +96,7 @@ def fetch_news(rss_urls: List[str], topic: str, limit: int) -> List[NewsItem]:
                     title=title,
                     link=link,
                     source=source,
-                    published_at=_to_datetime(entry),
+                    published_at=published_at,
                     content=summary,
                 )
             )

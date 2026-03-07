@@ -15,6 +15,7 @@ class Settings:
     schedule_cron: str
     timezone: str
     max_news_per_run: int
+    news_max_age_days: int
     database_path: Path
     rss_urls: List[str]
     telegram_bot_token: str | None
@@ -49,6 +50,7 @@ def load_settings() -> Settings:
         schedule_cron=os.getenv("SCHEDULE_CRON", "*/30 * * * *"),
         timezone=os.getenv("TIMEZONE", "Europe/Moscow"),
         max_news_per_run=int(os.getenv("MAX_NEWS_PER_RUN", "3")),
+        news_max_age_days=max(1, int(os.getenv("NEWS_MAX_AGE_DAYS", "1"))),
         database_path=db_path,
         rss_urls=rss_urls,
         telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN") or None,
