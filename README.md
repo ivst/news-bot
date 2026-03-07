@@ -70,6 +70,8 @@ Copy `.env.example` to `.env` and fill in:
 - `SCHEDULE_CRON` in cron format (default: every 30 minutes).
 - `SHORT_LINKS_ENABLED=true` - shorten links before publishing.
 - `SHORTENER_PROVIDER=isgd` or `tinyurl`.
+- `DEDUP_CLEANUP_ENABLED=true` - auto-clean dedup records on each run.
+- `DEDUP_RETENTION_DAYS=90` - keep dedup records for the last N days.
 
 ### LLM (OpenAI or DeepSeek)
 - `LLM_API_KEY` - provider API key.

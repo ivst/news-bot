@@ -70,6 +70,8 @@ docker compose logs -f
 - `SCHEDULE_CRON` в формате cron (по умолчанию каждые 30 минут).
 - `SHORT_LINKS_ENABLED=true` - сокращать ссылку перед публикацией.
 - `SHORTENER_PROVIDER=isgd` или `tinyurl`.
+- `DEDUP_CLEANUP_ENABLED=true` - автоочистка дедуп-записей на каждом запуске.
+- `DEDUP_RETENTION_DAYS=90` - хранить дедуп-записи за последние N дней.
 
 ### LLM (OpenAI или DeepSeek)
 - `LLM_API_KEY` - ключ провайдера.

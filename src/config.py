@@ -27,6 +27,8 @@ class Settings:
     llm_translation_enabled: bool
     short_links_enabled: bool
     shortener_provider: str
+    dedup_cleanup_enabled: bool
+    dedup_retention_days: int
 
 
 def _to_bool(value: str | None, default: bool = False) -> bool:
@@ -59,4 +61,6 @@ def load_settings() -> Settings:
         llm_translation_enabled=_to_bool(os.getenv("LLM_TRANSLATION_ENABLED"), default=False),
         short_links_enabled=_to_bool(os.getenv("SHORT_LINKS_ENABLED"), default=False),
         shortener_provider=os.getenv("SHORTENER_PROVIDER", "isgd").strip().lower(),
+        dedup_cleanup_enabled=_to_bool(os.getenv("DEDUP_CLEANUP_ENABLED"), default=True),
+        dedup_retention_days=max(1, int(os.getenv("DEDUP_RETENTION_DAYS", "90"))),
     )

@@ -43,6 +43,15 @@ def job() -> None:
         return
 
     store = SeenNewsStore(settings.database_path)
+    if settings.dedup_cleanup_enabled:
+        deleted = store.cleanup_older_than_days(settings.dedup_retention_days)
+        if deleted > 0:
+            logger.info(
+                "Dedup cleanup removed %s row(s) older than %s day(s)",
+                deleted,
+                settings.dedup_retention_days,
+            )
+            store.vacuum()
     tg = TelegramPublisher(settings.telegram_bot_token, settings.telegram_chat_id)
     vk = VKPublisher(settings.vk_group_id, settings.vk_access_token)
 
