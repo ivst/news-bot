@@ -148,7 +148,12 @@ def job() -> None:
         for channel_name, publisher in channels:
             try:
                 if channel_name == "vk":
-                    publisher.publish(vk_message, attachment_link=item.link, source_link=publish_link)
+                    publisher.publish(
+                        vk_message,
+                        attachment_link=item.link,
+                        source_link=publish_link,
+                        image_url=item.image_url,
+                    )
                 else:
                     publisher.publish(tg_message)
                 store.mark_seen(channel_name, item.link, published_at)

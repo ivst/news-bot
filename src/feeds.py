@@ -4,7 +4,7 @@ import html
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
-from typing import List
+from typing import List, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import feedparser
@@ -18,6 +18,7 @@ class NewsItem:
     source: str
     published_at: datetime
     content: str
+    image_url: Optional[str]
 
 
 def _to_datetime(entry) -> datetime:
@@ -37,6 +38,48 @@ def _extract_text(raw: str) -> str:
         return ""
     soup = BeautifulSoup(html.unescape(raw), "html.parser")
     return " ".join(soup.get_text(" ", strip=True).split())
+
+
+def _normalize_image_url(url: str) -> str:
+    if not url:
+        return ""
+    parts = urlsplit(url.strip())
+    scheme = parts.scheme.lower() or "https"
+    if scheme == "http":
+        scheme = "https"
+    return urlunsplit((scheme, parts.netloc.lower(), parts.path, parts.query, ""))
+
+
+def _extract_image_url(entry) -> Optional[str]:
+    media_content = entry.get("media_content") or []
+    for item in media_content:
+        url = _normalize_image_url(str(item.get("url") or ""))
+        if url:
+            return url
+
+    media_thumb = entry.get("media_thumbnail") or []
+    for item in media_thumb:
+        url = _normalize_image_url(str(item.get("url") or ""))
+        if url:
+            return url
+
+    links = entry.get("links") or []
+    for item in links:
+        if str(item.get("type") or "").startswith("image/"):
+            url = _normalize_image_url(str(item.get("href") or ""))
+            if url:
+                return url
+
+    summary_html = entry.get("summary") or ""
+    if summary_html:
+        soup = BeautifulSoup(html.unescape(summary_html), "html.parser")
+        img = soup.find("img")
+        if img and img.get("src"):
+            url = _normalize_image_url(str(img.get("src")))
+            if url:
+                return url
+
+    return None
 
 
 def _normalize_link(link: str) -> str:
@@ -109,6 +152,7 @@ def fetch_news(rss_urls: List[str], topic: str, limit: int, max_age_days: int = 
                     source=source,
                     published_at=published_at,
                     content=summary,
+                    image_url=_extract_image_url(entry),
                 )
             )
 
