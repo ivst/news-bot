@@ -16,7 +16,7 @@ class VKPublisher:
     def enabled(self) -> bool:
         return bool(self.group_id and self.access_token)
 
-    def publish(self, message: str) -> None:
+    def publish(self, message: str, attachment_link: Optional[str] = None) -> None:
         if not self.enabled:
             return
 
@@ -27,6 +27,8 @@ class VKPublisher:
             "access_token": self.access_token,
             "v": self.API_VERSION,
         }
+        if attachment_link:
+            payload["attachments"] = attachment_link
         resp = requests.post("https://api.vk.com/method/wall.post", data=payload, timeout=30)
         resp.raise_for_status()
         body = resp.json()

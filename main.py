@@ -122,7 +122,10 @@ def job() -> None:
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
         for channel_name, publisher in channels:
             try:
-                publisher.publish(message)
+                if channel_name == "vk":
+                    publisher.publish(message, attachment_link=item.link)
+                else:
+                    publisher.publish(message)
                 store.mark_seen(channel_name, item.link, published_at)
                 published_posts += 1
                 item_has_success = True
