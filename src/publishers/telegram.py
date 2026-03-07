@@ -22,6 +22,7 @@ class TelegramPublisher:
         payload = {
             "chat_id": self.chat_id,
             "text": message,
+            "parse_mode": "HTML",
             "disable_web_page_preview": False,
         }
         resp = requests.post(url, json=payload, timeout=30)

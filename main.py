@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import html
 import logging
+import re
 import time
 from datetime import timezone
 
@@ -24,12 +26,37 @@ logging.basicConfig(
 logger = logging.getLogger("news-bot")
 
 
-def build_message(title: str, summary: str, link: str) -> str:
-    msg = (
-        f"{title}\n\n"
-        f"{summary}\n\n"
-        f"Источник: {link}"
-    )
+def _normalize_title(title: str, max_len: int = 110) -> str:
+    out = " ".join(title.split())
+    # Remove common publisher tails from translated headlines.
+    out = re.sub(r"\s*[—\-|:]\s*(livedoor news|yahoo!ニュース|bing news|google news)\s*$", "", out, flags=re.IGNORECASE)
+    if len(out) > max_len:
+        out = out[:max_len].rsplit(" ", 1)[0] + "..."
+    return out
+
+
+def _normalize_summary(summary: str) -> str:
+    lines = [ln.strip() for ln in summary.splitlines() if ln.strip()]
+    if not lines:
+        return ""
+    normalized: list[str] = []
+    for ln in lines:
+        normalized.append(ln if ln.startswith("• ") else f"• {ln.lstrip('•').strip()}")
+    return "\n".join(normalized[:2])
+
+
+def build_telegram_message(title: str, summary: str, link: str) -> str:
+    safe_title = html.escape(title)
+    safe_summary = html.escape(summary)
+    safe_link = html.escape(link, quote=True)
+    msg = f"<b>{safe_title}</b>\n\n{safe_summary}\n\n<a href=\"{safe_link}\">Источник</a>"
+    if len(msg) > 3900:
+        msg = msg[:3890].rsplit(" ", 1)[0] + "..."
+    return msg
+
+
+def build_vk_message(title: str, summary: str, link: str) -> str:
+    msg = f"{title}\n\n{summary}\n\nИсточник: {link}"
     if len(msg) > 3900:
         msg = msg[:3890].rsplit(" ", 1)[0] + "..."
     return msg
@@ -110,22 +137,22 @@ def job() -> None:
         if not title:
             logger.warning("Skipped (translation failed for title): %s", item.link)
             continue
-        title = strip_ui_noise(title)
+        title = _normalize_title(strip_ui_noise(title))
         publish_link = item.link
         if settings.short_links_enabled:
             publish_link = shorten_url(item.link, settings.shortener_provider)
-
-        message = build_message(title, summary, publish_link)
-        message = strip_ui_noise(message)
+        summary = _normalize_summary(summary)
+        tg_message = strip_ui_noise(build_telegram_message(title, summary, item.link))
+        vk_message = strip_ui_noise(build_vk_message(title, summary, publish_link))
 
         item_has_success = False
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
         for channel_name, publisher in channels:
             try:
                 if channel_name == "vk":
-                    publisher.publish(message, attachment_link=item.link)
+                    publisher.publish(vk_message, attachment_link=item.link)
                 else:
-                    publisher.publish(message)
+                    publisher.publish(tg_message)
                 store.mark_seen(channel_name, item.link, published_at)
                 published_posts += 1
                 item_has_success = True

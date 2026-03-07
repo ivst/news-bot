@@ -44,6 +44,14 @@ def _normalize_link(link: str) -> str:
         return ""
 
     parts = urlsplit(link.strip())
+
+    # Unwrap Bing redirect URLs to the actual article URL.
+    if parts.netloc.lower().endswith("bing.com") and parts.path.lower().startswith("/news/apiclick"):
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        target = (query.get("url") or "").strip()
+        if target:
+            parts = urlsplit(target)
+
     drop_params = {
         "tid",
         "utm_source",
@@ -65,7 +73,10 @@ def _normalize_link(link: str) -> str:
     kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k.lower() not in drop_params]
     normalized_query = urlencode(kept, doseq=True)
 
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path, normalized_query, ""))
+    scheme = parts.scheme.lower() or "https"
+    if scheme == "http":
+        scheme = "https"
+    return urlunsplit((scheme, parts.netloc.lower(), parts.path, normalized_query, ""))
 
 
 def fetch_news(rss_urls: List[str], topic: str, limit: int, max_age_days: int = 1) -> List[NewsItem]:
