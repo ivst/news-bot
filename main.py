@@ -173,6 +173,8 @@ def job() -> None:
         settings.vk_group_id,
         settings.vk_access_token,
         photo_upload_enabled=settings.vk_photo_upload_enabled,
+        draft_mode=settings.vk_draft_mode,
+        draft_delay_minutes=settings.vk_draft_delay_minutes,
     )
 
     news = fetch_news(

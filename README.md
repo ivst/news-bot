@@ -67,6 +67,8 @@ Copy `.env.example` to `.env` and fill in:
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` for Telegram.
 - `VK_GROUP_ID`, `VK_ACCESS_TOKEN` for VK.
 - `VK_PHOTO_UPLOAD_ENABLED=true` - upload photos to VK via API (requires user token with `photos` scope).
+- `VK_DRAFT_MODE=false` - create postponed VK posts instead of immediate publishing.
+- `VK_DRAFT_DELAY_MINUTES=43200` - postpone delay in minutes (default 30 days).
 - `TARGET_LANGUAGE=ru` or another language code.
 - `SCHEDULE_CRON` in cron format (default: every 30 minutes).
 - `NEWS_MAX_AGE_DAYS=1` - only consider news not older than N days.

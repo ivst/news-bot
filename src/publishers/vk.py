@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from io import BytesIO
 from typing import Optional
 from urllib.parse import urljoin
@@ -18,10 +19,19 @@ class VKPublisher:
     API_VERSION = "5.199"
     API_BASE = "https://api.vk.com/method"
 
-    def __init__(self, group_id: Optional[str], access_token: Optional[str], photo_upload_enabled: bool = True):
+    def __init__(
+        self,
+        group_id: Optional[str],
+        access_token: Optional[str],
+        photo_upload_enabled: bool = True,
+        draft_mode: bool = False,
+        draft_delay_minutes: int = 43200,
+    ):
         self.group_id = group_id
         self.access_token = access_token
         self.photo_upload_enabled = photo_upload_enabled
+        self.draft_mode = draft_mode
+        self.draft_delay_minutes = max(10, draft_delay_minutes)
         self._photo_upload_disabled_by_auth = False
 
     @property
@@ -276,6 +286,8 @@ class VKPublisher:
             "access_token": self.access_token,
             "v": self.API_VERSION,
         }
+        if self.draft_mode:
+            payload["publish_date"] = int(time.time()) + (self.draft_delay_minutes * 60)
         if attachments:
             payload["attachments"] = ",".join(attachments)
 

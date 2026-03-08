@@ -23,6 +23,8 @@ class Settings:
     vk_group_id: str | None
     vk_access_token: str | None
     vk_photo_upload_enabled: bool
+    vk_draft_mode: bool
+    vk_draft_delay_minutes: int
     llm_api_key: str | None
     llm_model: str
     llm_base_url: str
@@ -68,6 +70,8 @@ def load_settings() -> Settings:
         vk_group_id=os.getenv("VK_GROUP_ID") or None,
         vk_access_token=os.getenv("VK_ACCESS_TOKEN") or None,
         vk_photo_upload_enabled=_to_bool(os.getenv("VK_PHOTO_UPLOAD_ENABLED"), default=True),
+        vk_draft_mode=_to_bool(os.getenv("VK_DRAFT_MODE"), default=False),
+        vk_draft_delay_minutes=max(10, int(os.getenv("VK_DRAFT_DELAY_MINUTES", "43200"))),
         llm_api_key=(os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or None),
         llm_model=os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gpt-4.1-mini")),
         llm_base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
