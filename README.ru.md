@@ -116,6 +116,33 @@ sudo systemctl start news-bot
 sudo journalctl -u news-bot -f
 ```
 
+### Запуск нескольких инстансов (systemd template)
+Если нужно вести несколько каналов/тем параллельно, используйте шаблонный unit `news-bot@.service`.
+
+1. Установите шаблонный unit:
+```bash
+sudo cp deploy/news-bot@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+2. Создайте env-файлы для каждого инстанса:
+```bash
+cp /opt/news-bot/.env /opt/news-bot/.env.main
+cp /opt/news-bot/.env /opt/news-bot/.env.pub2
+```
+3. В каждом файле задайте разные значения минимум для:
+- `TELEGRAM_CHAT_ID` и/или `VK_GROUP_ID`
+- `TARGET_TOPIC`
+- `DATABASE_PATH` (например `./data/news_main.db`, `./data/news_pub2.db`)
+4. Запустите инстансы:
+```bash
+sudo systemctl enable --now news-bot@main
+sudo systemctl enable --now news-bot@pub2
+```
+5. Логи конкретного инстанса:
+```bash
+sudo journalctl -u news-bot@pub2 -f
+```
+
 ### Обновление запущенного systemd-сервиса
 Можно обновить код, зависимости и перезапустить сервис одним скриптом:
 

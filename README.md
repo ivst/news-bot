@@ -116,6 +116,33 @@ sudo systemctl start news-bot
 sudo journalctl -u news-bot -f
 ```
 
+### Run multiple instances (systemd template)
+Use template unit `news-bot@.service` if you need multiple channels/topics in parallel.
+
+1. Install template unit:
+```bash
+sudo cp deploy/news-bot@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+2. Create env files per instance:
+```bash
+cp /opt/news-bot/.env /opt/news-bot/.env.main
+cp /opt/news-bot/.env /opt/news-bot/.env.pub2
+```
+3. In each file set separate values at least for:
+- `TELEGRAM_CHAT_ID` and/or `VK_GROUP_ID`
+- `TARGET_TOPIC`
+- `DATABASE_PATH` (for example `./data/news_main.db`, `./data/news_pub2.db`)
+4. Start instances:
+```bash
+sudo systemctl enable --now news-bot@main
+sudo systemctl enable --now news-bot@pub2
+```
+5. Logs for specific instance:
+```bash
+sudo journalctl -u news-bot@pub2 -f
+```
+
 ### Update running systemd service
 You can update code, dependencies, and restart the service with one script:
 
