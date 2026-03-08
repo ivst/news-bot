@@ -102,13 +102,19 @@ class VKPublisher:
 
         headers = {"User-Agent": "Mozilla/5.0 (news-bot)"}
         image_resp = requests.get(image_url, timeout=30, headers=headers)
-        if image_resp.status_code >= 400 and source_link:
+        content_type = (image_resp.headers.get("Content-Type") or "").lower()
+        if (image_resp.status_code >= 400 or not content_type.startswith("image/")) and source_link:
             headers["Referer"] = source_link
             image_resp = requests.get(image_url, timeout=30, headers=headers)
         image_resp.raise_for_status()
+        content_type = (image_resp.headers.get("Content-Type") or "").lower()
+        if not content_type.startswith("image/"):
+            raise RuntimeError(
+                f"Image URL did not return image content-type for VK upload: {image_url}, content-type={content_type}"
+            )
 
         raw_bytes = image_resp.content
-        raw_type = image_resp.headers.get("Content-Type", "image/jpeg")
+        raw_type = content_type or "image/jpeg"
         try:
             upload_bytes, upload_type = self._to_jpeg_if_needed(raw_bytes, raw_type, image_url)
         except Exception as ex:
@@ -119,12 +125,15 @@ class VKPublisher:
         upload_resp = requests.post(upload_url, files=files, timeout=60)
         upload_resp.raise_for_status()
         upload_body = upload_resp.json()
+        upload_photo = upload_body.get("photo")
+        if not upload_photo:
+            raise RuntimeError(f"VK upload returned empty photo payload: {upload_body}")
 
         saved = self._api_call(
             "photos.saveWallPhoto",
             {
                 "group_id": self.group_id,
-                "photo": upload_body.get("photo"),
+                "photo": upload_photo,
                 "server": upload_body.get("server"),
                 "hash": upload_body.get("hash"),
                 "access_token": self.access_token,
