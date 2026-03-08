@@ -151,9 +151,20 @@ chmod +x scripts/update_service.sh
 ./scripts/update_service.sh
 ```
 
+Script behavior:
+- if `SERVICE` is set, restarts only that unit;
+- if `SERVICE` is empty, auto-detects and restarts all `news-bot@*.service` units;
+- if no template units are found, restarts `news-bot`.
+
 Optional environment overrides:
 ```bash
 APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts/update_service.sh
+```
+
+Examples for template instances:
+```bash
+SERVICE='news-bot@main' ./scripts/update_service.sh
+SERVICE='news-bot@pub2' ./scripts/update_service.sh
 ```
 
 ## Notes

@@ -151,9 +151,20 @@ chmod +x scripts/update_service.sh
 ./scripts/update_service.sh
 ```
 
+Поведение скрипта:
+- если задан `SERVICE`, перезапускается только этот unit;
+- если `SERVICE` пустой, скрипт автоматически находит и перезапускает все `news-bot@*.service`;
+- если шаблонные unit'ы не найдены, перезапускается `news-bot`.
+
 Опциональные переопределения через переменные окружения:
 ```bash
 APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts/update_service.sh
+```
+
+Примеры для шаблонных инстансов:
+```bash
+SERVICE='news-bot@main' ./scripts/update_service.sh
+SERVICE='news-bot@pub2' ./scripts/update_service.sh
 ```
 
 ## Примечания
