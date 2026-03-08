@@ -71,6 +71,15 @@ class VKPublisher:
         img.save(out, format="JPEG", quality=90, optimize=True)
         return out.getvalue(), "image/jpeg"
 
+    @staticmethod
+    def _to_safe_jpeg(image_bytes: bytes) -> bytes:
+        # VK upload can return empty "photo" for some valid JPEGs.
+        # Re-encoding to plain RGB JPEG often fixes such cases.
+        img = Image.open(BytesIO(image_bytes)).convert("RGB")
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=90)
+        return out.getvalue()
+
     def _upload_wall_photo(self, image_url: str, source_link: Optional[str] = None) -> Optional[str]:
         if not image_url or not self.photo_upload_enabled or self._photo_upload_disabled_by_auth:
             return None
@@ -127,7 +136,21 @@ class VKPublisher:
         upload_body = upload_resp.json()
         upload_photo = upload_body.get("photo")
         if not upload_photo:
-            raise RuntimeError(f"VK upload returned empty photo payload: {upload_body}")
+            try:
+                safe_jpeg = self._to_safe_jpeg(raw_bytes)
+                retry_files = {"photo": ("news.jpg", safe_jpeg, "image/jpeg")}
+                retry_resp = requests.post(upload_url, files=retry_files, timeout=60)
+                retry_resp.raise_for_status()
+                retry_body = retry_resp.json()
+                upload_photo = retry_body.get("photo")
+                if upload_photo:
+                    upload_body = retry_body
+                else:
+                    raise RuntimeError(
+                        f"VK upload returned empty photo payload on retry: first={upload_body}, retry={retry_body}"
+                    )
+            except Exception as ex:
+                raise RuntimeError(f"VK upload returned empty photo payload: {upload_body}; retry_error={ex}") from ex
 
         saved = self._api_call(
             "photos.saveWallPhoto",
