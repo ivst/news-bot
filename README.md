@@ -141,3 +141,6 @@ Only rejected similar:
 ```bash
 sqlite3 /opt/news-bot/data/news.db "SELECT channel,similarity,link,created_at FROM post_attempts WHERE status='rejected_similar' ORDER BY id DESC LIMIT 30;"
 ```
+
+## License
+This project is licensed under the MIT License. See [LICENSE](LICENSE).

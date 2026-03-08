@@ -141,3 +141,6 @@ sqlite3 /opt/news-bot/data/news.db "SELECT channel,status,similarity,substr(titl
 ```bash
 sqlite3 /opt/news-bot/data/news.db "SELECT channel,similarity,link,created_at FROM post_attempts WHERE status='rejected_similar' ORDER BY id DESC LIMIT 30;"
 ```
+
+## Лицензия
+Проект распространяется по лицензии MIT. См. [LICENSE](LICENSE).
