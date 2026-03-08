@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramPublisher:
@@ -40,6 +43,29 @@ class TelegramPublisher:
         resp = requests.post(url, json=payload, timeout=30)
         resp.raise_for_status()
 
+    def _send_photo_upload(self, message: str, image_url: str) -> None:
+        caption = message
+        if len(caption) > 1024:
+            caption = caption[:1014].rsplit(" ", 1)[0] + "..."
+
+        image_resp = requests.get(image_url, timeout=30)
+        image_resp.raise_for_status()
+        content_type = image_resp.headers.get("content-type", "")
+        if not content_type.startswith("image/"):
+            raise requests.RequestException(f"unexpected content-type: {content_type}")
+
+        tg_url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+        data = {
+            "chat_id": str(self.chat_id),
+            "caption": caption,
+            "parse_mode": "HTML",
+        }
+        files = {
+            "photo": ("image.jpg", image_resp.content, content_type),
+        }
+        resp = requests.post(tg_url, data=data, files=files, timeout=30)
+        resp.raise_for_status()
+
     def publish(self, message: str, image_url: Optional[str] = None) -> None:
         if not self.enabled:
             return
@@ -48,8 +74,12 @@ class TelegramPublisher:
             try:
                 self._send_photo(message, image_url)
                 return
-            except requests.RequestException:
-                # Fall back to plain text if Telegram can't fetch the image URL.
-                pass
+            except requests.RequestException as exc:
+                logger.warning("Telegram sendPhoto by URL failed, trying upload fallback: %s", exc)
+            try:
+                self._send_photo_upload(message, image_url)
+                return
+            except requests.RequestException as exc:
+                logger.warning("Telegram sendPhoto upload fallback failed: %s", exc)
 
         self._send_message(message)
