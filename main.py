@@ -319,7 +319,7 @@ def job() -> None:
                         image_url=item.image_url,
                     )
                 else:
-                    publisher.publish(tg_message)
+                    publisher.publish(tg_message, image_url=item.image_url)
                 store.mark_seen(channel_name, item.link, published_at)
                 store.record_attempt(
                     channel=channel_name,
