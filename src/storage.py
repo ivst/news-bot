@@ -126,6 +126,20 @@ class SeenNewsStore:
             ).fetchall()
             return [(str(r[0]), str(r[1])) for r in rows]
 
+    def get_published_attempts_since(self, channel: str, days: int) -> List[Tuple[str, str, str]]:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=max(1, days))).isoformat()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT title, summary, link
+                FROM post_attempts
+                WHERE channel = ? AND status = 'published' AND created_at >= ?
+                ORDER BY created_at DESC
+                """,
+                (channel, cutoff),
+            ).fetchall()
+            return [(str(r[0]), str(r[1]), str(r[2])) for r in rows]
+
     def record_attempt(
         self,
         *,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import html
 import logging
 import re
@@ -26,6 +27,35 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("news-bot")
+
+_EVENT_STOPWORDS = {
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    "that",
+    "this",
+    "will",
+    "into",
+    "about",
+    "news",
+    "источник",
+    "это",
+    "как",
+    "что",
+    "или",
+    "для",
+    "при",
+    "без",
+    "после",
+    "before",
+    "after",
+    "over",
+    "under",
+    "если",
+    "also",
+}
 
 
 def _normalize_title(title: str) -> str:
@@ -65,6 +95,28 @@ def _text_norm_for_similarity(title: str, summary: str) -> str:
     if summary_norm and title_norm:
         return f"{summary_norm} {title_norm}"
     return summary_norm or title_norm
+
+
+def _event_tokens(text: str) -> list[str]:
+    tokens: list[str] = []
+    for tok in text.split():
+        if len(tok) < 3 and not any(ch.isdigit() for ch in tok):
+            continue
+        if tok in _EVENT_STOPWORDS:
+            continue
+        tokens.append(tok)
+    return tokens
+
+
+def _event_key(title: str, summary: str, min_tokens: int) -> str:
+    base = _normalize_for_similarity(f"{title} {summary}")
+    if not base:
+        return ""
+    uniq = sorted(set(_event_tokens(base)))
+    if len(uniq) < max(2, min_tokens):
+        return ""
+    digest = hashlib.sha1(" ".join(uniq).encode("utf-8")).hexdigest()
+    return digest[:16]
 
 
 def _similarity_ratio(a: str, b: str) -> float:
@@ -126,6 +178,25 @@ def _find_similar_recent(
     return False, best_score, best_link, best_reason
 
 
+def _find_event_duplicate_recent(
+    store: SeenNewsStore,
+    *,
+    channel: str,
+    title: str,
+    summary: str,
+    window_days: int,
+    min_tokens: int,
+) -> tuple[bool, str | None, str]:
+    curr_key = _event_key(title, summary, min_tokens)
+    if not curr_key:
+        return False, None, ""
+    for old_title, old_summary, old_link in store.get_published_attempts_since(channel, window_days):
+        old_key = _event_key(old_title, old_summary, min_tokens)
+        if old_key and old_key == curr_key:
+            return True, old_link, curr_key
+    return False, None, curr_key
+
+
 def build_telegram_message(title: str, summary: str, link: str) -> str:
     safe_title = html.escape(title)
     safe_summary = html.escape(summary)
@@ -145,6 +216,7 @@ def build_vk_message(title: str, summary: str) -> str:
 
 def job() -> None:
     settings = load_settings()
+    duplicate_action = settings.duplicate_action if settings.duplicate_action in {"skip", "draft"} else "skip"
 
     if not settings.rss_urls:
         logger.error("RSS_URLS is empty. Nothing to fetch.")
@@ -282,6 +354,64 @@ def job() -> None:
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
         for channel_name, publisher in channels:
             try:
+                if settings.event_tag_dedup_enabled:
+                    is_event_dup, match_link, event_key = _find_event_duplicate_recent(
+                        store,
+                        channel=channel_name,
+                        title=title,
+                        summary=summary,
+                        window_days=settings.event_tag_dedup_window_days,
+                        min_tokens=settings.event_tag_dedup_min_tokens,
+                    )
+                    if is_event_dup:
+                        if duplicate_action == "draft" and channel_name == "vk":
+                            logger.info(
+                                "Drafted as event-duplicate for %s: %s (matched=%s, event_key=%s)",
+                                channel_name,
+                                item.link,
+                                match_link or "-",
+                                event_key or "-",
+                            )
+                            publisher.publish(
+                                vk_message,
+                                attachment_link=item.link,
+                                source_link=publish_link,
+                                image_url=item.image_url,
+                                force_draft=True,
+                            )
+                            store.mark_seen(channel_name, item.link, published_at)
+                            store.record_attempt(
+                                channel=channel_name,
+                                link=item.link,
+                                title=title,
+                                summary=summary,
+                                text_norm=text_norm,
+                                status="published_draft_duplicate",
+                                reason=f"event_duplicate;matched:{match_link or ''};event_key:{event_key}",
+                            )
+                            published_posts += 1
+                            item_has_success = True
+                            time.sleep(1)
+                            continue
+                        logger.info(
+                            "Rejected as event-duplicate for %s: %s (matched=%s, event_key=%s)",
+                            channel_name,
+                            item.link,
+                            match_link or "-",
+                            event_key or "-",
+                        )
+                        store.record_attempt(
+                            channel=channel_name,
+                            link=item.link,
+                            title=title,
+                            summary=summary,
+                            text_norm=text_norm,
+                            status="rejected_event_duplicate",
+                            reason=f"matched:{match_link or ''};event_key:{event_key}",
+                        )
+                        store.mark_seen(channel_name, item.link, published_at)
+                        continue
+
                 if settings.similar_dedup_enabled:
                     is_similar, score, match_link, similarity_reason = _find_similar_recent(
                         store,
@@ -293,6 +423,37 @@ def job() -> None:
                         min_overlap_tokens=settings.similar_dedup_min_overlap_tokens,
                     )
                     if is_similar:
+                        if duplicate_action == "draft" and channel_name == "vk":
+                            logger.info(
+                                "Drafted as similar for %s: %s (score=%.3f, matched=%s, reason=%s)",
+                                channel_name,
+                                item.link,
+                                score,
+                                match_link or "-",
+                                similarity_reason or "-",
+                            )
+                            publisher.publish(
+                                vk_message,
+                                attachment_link=item.link,
+                                source_link=publish_link,
+                                image_url=item.image_url,
+                                force_draft=True,
+                            )
+                            store.mark_seen(channel_name, item.link, published_at)
+                            store.record_attempt(
+                                channel=channel_name,
+                                link=item.link,
+                                title=title,
+                                summary=summary,
+                                text_norm=text_norm,
+                                status="published_draft_duplicate",
+                                reason=f"similar_duplicate;matched:{match_link or ''};{similarity_reason}",
+                                similarity=score,
+                            )
+                            published_posts += 1
+                            item_has_success = True
+                            time.sleep(1)
+                            continue
                         logger.info(
                             "Rejected as similar for %s: %s (score=%.3f, matched=%s, reason=%s)",
                             channel_name,

@@ -78,6 +78,10 @@ Copy `.env.example` to `.env` and fill in:
 - `DEDUP_RETENTION_DAYS=90` - keep dedup records for the last N days.
 - `POST_ATTEMPTS_RETENTION_DAYS=30` - keep publish/reject attempts for the last N days.
 - `REQUIRE_IMAGE_FOR_PUBLISH=false` - publish only items that have an extracted image URL.
+- `DUPLICATE_ACTION=skip` - duplicate handling mode: `skip` or `draft` (for VK duplicates).
+- `EVENT_TAG_DEDUP_ENABLED=false` - reject posts with the same event key built from normalized tags.
+- `EVENT_TAG_DEDUP_WINDOW_DAYS=1` - compare event keys against published posts for the last N days.
+- `EVENT_TAG_DEDUP_MIN_TOKENS=4` - minimum number of meaningful tokens required to form event key.
 - `SIMILAR_DEDUP_ENABLED=true` - reject very similar recent posts.
 - `SIMILAR_DEDUP_WINDOW=15` - compare against the last N published posts per channel.
 - `SIMILAR_DEDUP_THRESHOLD=0.90` - similarity threshold (0..1).

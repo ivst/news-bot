@@ -37,6 +37,10 @@ class Settings:
     dedup_retention_days: int
     post_attempts_retention_days: int
     require_image_for_publish: bool
+    duplicate_action: str
+    event_tag_dedup_enabled: bool
+    event_tag_dedup_window_days: int
+    event_tag_dedup_min_tokens: int
     similar_dedup_enabled: bool
     similar_dedup_window: int
     similar_dedup_threshold: float
@@ -89,6 +93,10 @@ def load_settings() -> Settings:
         dedup_retention_days=max(1, int(os.getenv("DEDUP_RETENTION_DAYS", "90"))),
         post_attempts_retention_days=max(1, int(os.getenv("POST_ATTEMPTS_RETENTION_DAYS", "30"))),
         require_image_for_publish=_to_bool(os.getenv("REQUIRE_IMAGE_FOR_PUBLISH"), default=False),
+        duplicate_action=(os.getenv("DUPLICATE_ACTION", "skip").strip().lower() or "skip"),
+        event_tag_dedup_enabled=_to_bool(os.getenv("EVENT_TAG_DEDUP_ENABLED"), default=False),
+        event_tag_dedup_window_days=max(1, int(os.getenv("EVENT_TAG_DEDUP_WINDOW_DAYS", "1"))),
+        event_tag_dedup_min_tokens=max(2, int(os.getenv("EVENT_TAG_DEDUP_MIN_TOKENS", "4"))),
         similar_dedup_enabled=_to_bool(os.getenv("SIMILAR_DEDUP_ENABLED"), default=True),
         similar_dedup_window=max(1, int(os.getenv("SIMILAR_DEDUP_WINDOW", "15"))),
         similar_dedup_threshold=min(1.0, max(0.0, float(os.getenv("SIMILAR_DEDUP_THRESHOLD", "0.90")))),

@@ -258,6 +258,7 @@ class VKPublisher:
         attachment_link: Optional[str] = None,
         source_link: Optional[str] = None,
         image_url: Optional[str] = None,
+        force_draft: Optional[bool] = None,
     ) -> None:
         if not self.enabled:
             return
@@ -286,7 +287,8 @@ class VKPublisher:
             "access_token": self.access_token,
             "v": self.API_VERSION,
         }
-        if self.draft_mode:
+        effective_draft_mode = self.draft_mode if force_draft is None else bool(force_draft)
+        if effective_draft_mode:
             payload["publish_date"] = int(time.time()) + (self.draft_delay_minutes * 60)
         if attachments:
             payload["attachments"] = ",".join(attachments)

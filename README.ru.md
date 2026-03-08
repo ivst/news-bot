@@ -78,6 +78,10 @@ docker compose logs -f
 - `DEDUP_RETENTION_DAYS=90` - хранить дедуп-записи за последние N дней.
 - `POST_ATTEMPTS_RETENTION_DAYS=30` - хранить историю попыток публикации/отказов за последние N дней.
 - `REQUIRE_IMAGE_FOR_PUBLISH=false` - публиковать только новости, у которых удалось извлечь URL изображения.
+- `DUPLICATE_ACTION=skip` - режим обработки дублей: `skip` или `draft` (для дублей в VK).
+- `EVENT_TAG_DEDUP_ENABLED=false` - отклонять посты с одинаковым event key, собранным из нормализованных тегов.
+- `EVENT_TAG_DEDUP_WINDOW_DAYS=1` - сравнивать event key с опубликованными постами за последние N дней.
+- `EVENT_TAG_DEDUP_MIN_TOKENS=4` - минимальное число значимых токенов для формирования event key.
 - `SIMILAR_DEDUP_ENABLED=true` - отклонять слишком похожие недавние посты.
 - `SIMILAR_DEDUP_WINDOW=15` - сравнивать с последними N опубликованными постами по каналу.
 - `SIMILAR_DEDUP_THRESHOLD=0.90` - порог похожести (0..1).
