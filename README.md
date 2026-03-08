@@ -75,9 +75,12 @@ Copy `.env.example` to `.env` and fill in:
 - `DEDUP_CLEANUP_ENABLED=true` - auto-clean dedup records on each run.
 - `DEDUP_RETENTION_DAYS=90` - keep dedup records for the last N days.
 - `POST_ATTEMPTS_RETENTION_DAYS=30` - keep publish/reject attempts for the last N days.
+- `REQUIRE_IMAGE_FOR_PUBLISH=false` - publish only items that have an extracted image URL.
 - `SIMILAR_DEDUP_ENABLED=true` - reject very similar recent posts.
 - `SIMILAR_DEDUP_WINDOW=15` - compare against the last N published posts per channel.
 - `SIMILAR_DEDUP_THRESHOLD=0.90` - similarity threshold (0..1).
+- `SIMILAR_DEDUP_TOKEN_THRESHOLD=0.72` - token Jaccard threshold (0..1) for near-duplicate detection.
+- `SIMILAR_DEDUP_MIN_OVERLAP_TOKENS=6` - minimal number of overlapping tokens for token-based dedup.
 
 ### LLM (OpenAI or DeepSeek)
 - `LLM_API_KEY` - provider API key.

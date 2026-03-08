@@ -75,9 +75,12 @@ docker compose logs -f
 - `DEDUP_CLEANUP_ENABLED=true` - автоочистка дедуп-записей на каждом запуске.
 - `DEDUP_RETENTION_DAYS=90` - хранить дедуп-записи за последние N дней.
 - `POST_ATTEMPTS_RETENTION_DAYS=30` - хранить историю попыток публикации/отказов за последние N дней.
+- `REQUIRE_IMAGE_FOR_PUBLISH=false` - публиковать только новости, у которых удалось извлечь URL изображения.
 - `SIMILAR_DEDUP_ENABLED=true` - отклонять слишком похожие недавние посты.
 - `SIMILAR_DEDUP_WINDOW=15` - сравнивать с последними N опубликованными постами по каналу.
 - `SIMILAR_DEDUP_THRESHOLD=0.90` - порог похожести (0..1).
+- `SIMILAR_DEDUP_TOKEN_THRESHOLD=0.72` - порог токенного Jaccard-сходства (0..1) для поиска близких дублей.
+- `SIMILAR_DEDUP_MIN_OVERLAP_TOKENS=6` - минимальное число общих токенов для токенного дедупа.
 
 ### LLM (OpenAI или DeepSeek)
 - `LLM_API_KEY` - ключ провайдера.
