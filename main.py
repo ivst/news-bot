@@ -35,14 +35,14 @@ def _normalize_title(title: str) -> str:
     return out
 
 
-def _normalize_summary(summary: str) -> str:
+def _normalize_summary(summary: str, max_lines: int) -> str:
     lines = [ln.strip() for ln in summary.splitlines() if ln.strip()]
     if not lines:
         return ""
     normalized: list[str] = []
     for ln in lines:
         normalized.append(ln if ln.startswith("• ") else f"• {ln.lstrip('•').strip()}")
-    return "\n".join(normalized[:2])
+    return "\n".join(normalized[: max(1, max_lines)])
 
 
 def _normalize_for_similarity(text: str) -> str:
@@ -243,6 +243,7 @@ def job() -> None:
             llm_model=settings.llm_model,
             llm_base_url=settings.llm_base_url,
             prompt_template=settings.llm_summary_prompt,
+            summary_max_lines=settings.summary_max_lines,
         )
         summary = strip_ui_noise(summary)
         title = translate_text(
@@ -270,7 +271,7 @@ def job() -> None:
         publish_link = item.link
         if settings.short_links_enabled:
             publish_link = shorten_url(item.link, settings.shortener_provider)
-        summary = _normalize_summary(summary)
+        summary = _normalize_summary(summary, settings.summary_max_lines)
         tg_message = strip_ui_noise(build_telegram_message(title, summary, item.link))
         vk_message = strip_ui_noise(build_vk_message(title, summary))
         text_norm = _text_norm_for_similarity(title, summary)

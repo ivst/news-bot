@@ -28,6 +28,7 @@ class Settings:
     llm_base_url: str
     llm_translation_enabled: bool
     llm_summary_prompt: str
+    summary_max_lines: int
     short_links_enabled: bool
     shortener_provider: str
     dedup_cleanup_enabled: bool
@@ -74,9 +75,10 @@ def load_settings() -> Settings:
         llm_summary_prompt=os.getenv(
             "LLM_SUMMARY_PROMPT",
             "You are an editor for Telegram and VK digest posts. Write in '{target_language}'. "
-            "Return exactly 2 lines, each line starts with '• '. "
+            "Return exactly {summary_max_lines} lines, each line starts with '• '. "
             "Keep it factual and concise, no hype, no markdown, no date/source/link repetition.",
         ),
+        summary_max_lines=max(1, int(os.getenv("SUMMARY_MAX_LINES", "3"))),
         short_links_enabled=_to_bool(os.getenv("SHORT_LINKS_ENABLED"), default=False),
         shortener_provider=os.getenv("SHORTENER_PROVIDER", "isgd").strip().lower(),
         dedup_cleanup_enabled=_to_bool(os.getenv("DEDUP_CLEANUP_ENABLED"), default=True),
