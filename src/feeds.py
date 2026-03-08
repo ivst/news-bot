@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -57,35 +56,17 @@ def _normalize_image_url(url: str) -> str:
     return urlunsplit((scheme, parts.netloc.lower(), parts.path, parts.query, ""))
 
 
-def _with_bing_image_size(url: str, entry) -> str:
+def _normalize_bing_image_url(url: str) -> str:
     parts = urlsplit(url)
     if not parts.netloc.lower().endswith("bing.com") or parts.path.lower() != "/th":
         return url
 
-    max_w = entry.get("news_imagemaxwidth")
-    max_h = entry.get("news_imagemaxheight")
-    if not max_w or not max_h:
-        return url
-
-    try:
-        width = int(str(max_w))
-        height = int(str(max_h))
-    except (TypeError, ValueError):
-        return url
-    if width <= 0 or height <= 0:
-        return url
-
     params = dict(parse_qsl(parts.query, keep_blank_values=True))
-    params["w"] = str(width)
-    params["h"] = str(height)
+    image_id = (params.get("id") or "").strip()
+    if not image_id:
+        return url
 
-    template = str(entry.get("news_imagesize") or "")
-    template = html.unescape(template).replace(";=", "=")
-    match = re.search(r"(?:^|&)c=(\d+)(?:&|$)", template)
-    if match:
-        params["c"] = match.group(1)
-
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(params, doseq=True), ""))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode({"id": image_id}), ""))
 
 
 def _extract_image_from_article(link: str) -> Optional[str]:
@@ -123,13 +104,12 @@ def _extract_image_url(entry, article_link: str = "") -> Optional[str]:
     # Yahoo RSS often provides preview image in the <image> tag.
     entry_image = entry.get("image")
     if isinstance(entry_image, str):
-        url = _with_bing_image_size(_normalize_image_url(entry_image), entry)
+        url = _normalize_bing_image_url(_normalize_image_url(entry_image))
         if url:
             return url
     elif isinstance(entry_image, dict):
-        url = _with_bing_image_size(
+        url = _normalize_bing_image_url(
             _normalize_image_url(str(entry_image.get("href") or entry_image.get("url") or "")),
-            entry,
         )
         if url:
             return url
@@ -137,13 +117,12 @@ def _extract_image_url(entry, article_link: str = "") -> Optional[str]:
     # Bing News namespace can be exposed as entry["news_image"].
     news_image = entry.get("news_image")
     if isinstance(news_image, str):
-        url = _with_bing_image_size(_normalize_image_url(news_image), entry)
+        url = _normalize_bing_image_url(_normalize_image_url(news_image))
         if url:
             return url
     elif isinstance(news_image, dict):
-        url = _with_bing_image_size(
+        url = _normalize_bing_image_url(
             _normalize_image_url(str(news_image.get("href") or news_image.get("url") or "")),
-            entry,
         )
         if url:
             return url
