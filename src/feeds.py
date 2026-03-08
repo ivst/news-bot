@@ -36,7 +36,11 @@ def _to_datetime(entry) -> datetime:
 def _extract_text(raw: str) -> str:
     if not raw:
         return ""
-    soup = BeautifulSoup(html.unescape(raw), "html.parser")
+    text = html.unescape(raw).strip()
+    # Avoid BeautifulSoup warnings on plain text that looks like a path/filename.
+    if "<" not in text or ">" not in text:
+        return " ".join(text.split())
+    soup = BeautifulSoup(text, "html.parser")
     return " ".join(soup.get_text(" ", strip=True).split())
 
 
@@ -72,7 +76,10 @@ def _extract_image_url(entry) -> Optional[str]:
 
     summary_html = entry.get("summary") or ""
     if summary_html:
-        soup = BeautifulSoup(html.unescape(summary_html), "html.parser")
+        summary_html = html.unescape(summary_html).strip()
+        if "<img" not in summary_html.lower():
+            return None
+        soup = BeautifulSoup(summary_html, "html.parser")
         img = soup.find("img")
         if img and img.get("src"):
             url = _normalize_image_url(str(img.get("src")))
