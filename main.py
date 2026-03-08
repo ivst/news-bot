@@ -197,6 +197,22 @@ def job() -> None:
         if not channels:
             continue
 
+        if settings.require_image_for_publish and not item.image_url:
+            logger.info("Skipped (image required but missing): %s", item.link)
+            published_at = item.published_at.astimezone(timezone.utc).isoformat()
+            for channel_name, _ in channels:
+                store.record_attempt(
+                    channel=channel_name,
+                    link=item.link,
+                    title=item.title,
+                    summary="",
+                    text_norm="",
+                    status="rejected_no_image",
+                    reason="image_required",
+                )
+                store.mark_seen(channel_name, item.link, published_at)
+            continue
+
         source_text = item.content if item.content else item.title
         translated = translate_text(
             source_text,
