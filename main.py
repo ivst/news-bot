@@ -73,6 +73,20 @@ def _similarity_ratio(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
+def _token_set(text: str) -> set[str]:
+    return {tok for tok in text.split() if len(tok) >= 3}
+
+
+def _token_jaccard(a_tokens: set[str], b_tokens: set[str]) -> tuple[float, int]:
+    if not a_tokens or not b_tokens:
+        return 0.0, 0
+    overlap = len(a_tokens & b_tokens)
+    union = len(a_tokens | b_tokens)
+    if union == 0:
+        return 0.0, overlap
+    return overlap / union, overlap
+
+
 def _find_similar_recent(
     store: SeenNewsStore,
     *,
@@ -80,15 +94,36 @@ def _find_similar_recent(
     text_norm: str,
     window: int,
     threshold: float,
-) -> tuple[bool, float, str | None]:
+    token_threshold: float,
+    min_overlap_tokens: int,
+) -> tuple[bool, float, str | None, str]:
     best_score = 0.0
     best_link = None
+    best_reason = ""
+    curr_tokens = _token_set(text_norm)
     for old_text_norm, old_link in store.get_recent_published_texts(channel, window):
-        score = _similarity_ratio(text_norm, old_text_norm)
+        seq_score = _similarity_ratio(text_norm, old_text_norm)
+        old_tokens = _token_set(old_text_norm)
+        token_score, overlap = _token_jaccard(curr_tokens, old_tokens)
+
+        is_seq_match = seq_score >= threshold
+        is_token_match = token_score >= token_threshold and overlap >= min_overlap_tokens
+        score = max(seq_score, token_score)
+
         if score > best_score:
             best_score = score
             best_link = old_link
-    return best_score >= threshold, best_score, best_link
+            if is_seq_match:
+                best_reason = f"sequence:{seq_score:.3f}"
+            elif is_token_match:
+                best_reason = f"token_jaccard:{token_score:.3f},overlap:{overlap}"
+            else:
+                best_reason = f"best_non_match:sequence:{seq_score:.3f},token_jaccard:{token_score:.3f},overlap:{overlap}"
+
+        if is_seq_match or is_token_match:
+            return True, score, old_link, best_reason
+
+    return False, best_score, best_link, best_reason
 
 
 def build_telegram_message(title: str, summary: str, link: str) -> str:
@@ -229,20 +264,23 @@ def job() -> None:
         for channel_name, publisher in channels:
             try:
                 if settings.similar_dedup_enabled:
-                    is_similar, score, match_link = _find_similar_recent(
+                    is_similar, score, match_link, similarity_reason = _find_similar_recent(
                         store,
                         channel=channel_name,
                         text_norm=text_norm,
                         window=settings.similar_dedup_window,
                         threshold=settings.similar_dedup_threshold,
+                        token_threshold=settings.similar_dedup_token_threshold,
+                        min_overlap_tokens=settings.similar_dedup_min_overlap_tokens,
                     )
                     if is_similar:
                         logger.info(
-                            "Rejected as similar for %s: %s (score=%.3f, matched=%s)",
+                            "Rejected as similar for %s: %s (score=%.3f, matched=%s, reason=%s)",
                             channel_name,
                             item.link,
                             score,
                             match_link or "-",
+                            similarity_reason or "-",
                         )
                         store.record_attempt(
                             channel=channel_name,
@@ -251,7 +289,7 @@ def job() -> None:
                             summary=summary,
                             text_norm=text_norm,
                             status="rejected_similar",
-                            reason=f"matched:{match_link or ''}",
+                            reason=f"matched:{match_link or ''};{similarity_reason}",
                             similarity=score,
                         )
                         store.mark_seen(channel_name, item.link, published_at)

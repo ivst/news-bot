@@ -36,6 +36,8 @@ class Settings:
     similar_dedup_enabled: bool
     similar_dedup_window: int
     similar_dedup_threshold: float
+    similar_dedup_token_threshold: float
+    similar_dedup_min_overlap_tokens: int
 
 
 def _to_bool(value: str | None, default: bool = False) -> bool:
@@ -82,4 +84,9 @@ def load_settings() -> Settings:
         similar_dedup_enabled=_to_bool(os.getenv("SIMILAR_DEDUP_ENABLED"), default=True),
         similar_dedup_window=max(1, int(os.getenv("SIMILAR_DEDUP_WINDOW", "15"))),
         similar_dedup_threshold=min(1.0, max(0.0, float(os.getenv("SIMILAR_DEDUP_THRESHOLD", "0.90")))),
+        similar_dedup_token_threshold=min(
+            1.0,
+            max(0.0, float(os.getenv("SIMILAR_DEDUP_TOKEN_THRESHOLD", "0.72"))),
+        ),
+        similar_dedup_min_overlap_tokens=max(1, int(os.getenv("SIMILAR_DEDUP_MIN_OVERLAP_TOKENS", "6"))),
     )
