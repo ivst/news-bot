@@ -55,6 +55,17 @@ def _normalize_image_url(url: str) -> str:
 
 
 def _extract_image_url(entry) -> Optional[str]:
+    # Yahoo RSS often provides preview image in the <image> tag.
+    entry_image = entry.get("image")
+    if isinstance(entry_image, str):
+        url = _normalize_image_url(entry_image)
+        if url:
+            return url
+    elif isinstance(entry_image, dict):
+        url = _normalize_image_url(str(entry_image.get("href") or entry_image.get("url") or ""))
+        if url:
+            return url
+
     media_content = entry.get("media_content") or []
     for item in media_content:
         url = _normalize_image_url(str(item.get("url") or ""))
