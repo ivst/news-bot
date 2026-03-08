@@ -8,6 +8,7 @@ from typing import List, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import feedparser
+import requests
 from bs4 import BeautifulSoup
 
 
@@ -54,7 +55,38 @@ def _normalize_image_url(url: str) -> str:
     return urlunsplit((scheme, parts.netloc.lower(), parts.path, parts.query, ""))
 
 
-def _extract_image_url(entry) -> Optional[str]:
+def _extract_image_from_article(link: str) -> Optional[str]:
+    if not link:
+        return None
+    try:
+        resp = requests.get(
+            link,
+            timeout=12,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; NewsBot/1.0)"},
+        )
+        resp.raise_for_status()
+        content_type = (resp.headers.get("content-type") or "").lower()
+        if "html" not in content_type:
+            return None
+        soup = BeautifulSoup(resp.text, "html.parser")
+        selectors = [
+            ("property", "og:image"),
+            ("property", "og:image:url"),
+            ("name", "twitter:image"),
+            ("itemprop", "image"),
+        ]
+        for attr, value in selectors:
+            node = soup.find("meta", attrs={attr: value})
+            if node and node.get("content"):
+                url = _normalize_image_url(str(node.get("content")))
+                if url:
+                    return url
+    except requests.RequestException:
+        return None
+    return None
+
+
+def _extract_image_url(entry, article_link: str = "") -> Optional[str]:
     # Yahoo RSS often provides preview image in the <image> tag.
     entry_image = entry.get("image")
     if isinstance(entry_image, str):
@@ -100,7 +132,7 @@ def _extract_image_url(entry) -> Optional[str]:
     if summary_html:
         summary_html = html.unescape(summary_html).strip()
         if "<img" not in summary_html.lower():
-            return None
+            return _extract_image_from_article(article_link)
         soup = BeautifulSoup(summary_html, "html.parser")
         img = soup.find("img")
         if img and img.get("src"):
@@ -108,7 +140,7 @@ def _extract_image_url(entry) -> Optional[str]:
             if url:
                 return url
 
-    return None
+    return _extract_image_from_article(article_link)
 
 
 def _normalize_link(link: str) -> str:
@@ -181,7 +213,7 @@ def fetch_news(rss_urls: List[str], topic: str, limit: int, max_age_days: int = 
                     source=source,
                     published_at=published_at,
                     content=summary,
-                    image_url=_extract_image_url(entry),
+                    image_url=_extract_image_url(entry, link),
                 )
             )
 
