@@ -66,6 +66,17 @@ def _extract_image_url(entry) -> Optional[str]:
         if url:
             return url
 
+    # Bing News namespace can be exposed as entry["news_image"].
+    news_image = entry.get("news_image")
+    if isinstance(news_image, str):
+        url = _normalize_image_url(news_image)
+        if url:
+            return url
+    elif isinstance(news_image, dict):
+        url = _normalize_image_url(str(news_image.get("href") or news_image.get("url") or ""))
+        if url:
+            return url
+
     media_content = entry.get("media_content") or []
     for item in media_content:
         url = _normalize_image_url(str(item.get("url") or ""))
