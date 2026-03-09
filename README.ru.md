@@ -65,10 +65,10 @@ docker compose logs -f
 Скопируйте `.env.example` в `.env` и заполните:
 - `TARGET_TOPIC` - тема материалов (например `world news`, `AI`, `fintech`).
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` для Telegram.
-- `TELEGRAM_ACTIVE_HOURS=` - окно публикации Telegram в локальной `TIMEZONE` (`HH-HH`, например `10-18`; по умолчанию пусто = 24/7).
+- `TELEGRAM_ACTIVE_HOURS=` - окно публикации Telegram в локальной `TIMEZONE` (`HH-HH`, например `10-18` или `0-24`; по умолчанию пусто = 24/7).
 - `TELEGRAM_SHOW_SOURCE=true` - добавлять строку/ссылку на источник в пост Telegram.
 - `VK_GROUP_ID`, `VK_ACCESS_TOKEN` для VK.
-- `VK_ACTIVE_HOURS=` - окно публикации VK в локальной `TIMEZONE` (`HH-HH`, например `10-18`; по умолчанию пусто = 24/7).
+- `VK_ACTIVE_HOURS=` - окно публикации VK в локальной `TIMEZONE` (`HH-HH`, например `10-18` или `0-24`; по умолчанию пусто = 24/7).
 - `VK_SHOW_SOURCE=true` - добавлять маркер/ссылку источника в текст поста VK.
 - `VK_PHOTO_UPLOAD_ENABLED=true` - загружать фото в VK через API (нужен user token с правом `photos`).
 - `VK_DRAFT_MODE=false` - создавать отложенные посты VK вместо немедленной публикации.
@@ -171,7 +171,7 @@ chmod +x scripts/update_service.sh
 
 Опциональные переопределения через переменные окружения:
 ```bash
-APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts/update_service.sh
+APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=main ./scripts/update_service.sh
 ```
 
 Примеры для шаблонных инстансов:

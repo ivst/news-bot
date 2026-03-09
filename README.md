@@ -65,10 +65,10 @@ docker compose logs -f
 Copy `.env.example` to `.env` and fill in:
 - `TARGET_TOPIC` - topic to collect (for example `world news`, `AI`, `fintech`).
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` for Telegram.
-- `TELEGRAM_ACTIVE_HOURS=` - active publish window for Telegram in local `TIMEZONE` (`HH-HH`, for example `10-18`; empty by default means 24/7).
+- `TELEGRAM_ACTIVE_HOURS=` - active publish window for Telegram in local `TIMEZONE` (`HH-HH`, for example `10-18` or `0-24`; empty by default means 24/7).
 - `TELEGRAM_SHOW_SOURCE=true` - include the source line/link in Telegram posts.
 - `VK_GROUP_ID`, `VK_ACCESS_TOKEN` for VK.
-- `VK_ACTIVE_HOURS=` - active publish window for VK in local `TIMEZONE` (`HH-HH`, for example `10-18`; empty by default means 24/7).
+- `VK_ACTIVE_HOURS=` - active publish window for VK in local `TIMEZONE` (`HH-HH`, for example `10-18` or `0-24`; empty by default means 24/7).
 - `VK_SHOW_SOURCE=true` - include source marker/link fallback in VK post text.
 - `VK_PHOTO_UPLOAD_ENABLED=true` - upload photos to VK via API (requires user token with `photos` scope).
 - `VK_DRAFT_MODE=false` - create postponed VK posts instead of immediate publishing.
@@ -171,7 +171,7 @@ Script behavior:
 
 Optional environment overrides:
 ```bash
-APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts/update_service.sh
+APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=main ./scripts/update_service.sh
 ```
 
 Examples for template instances:

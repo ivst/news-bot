@@ -8,6 +8,18 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+def _ensure_telegram_ok(resp: requests.Response) -> None:
+    resp.raise_for_status()
+    try:
+        body = resp.json()
+    except ValueError as ex:
+        raise requests.RequestException("Telegram API returned non-JSON response") from ex
+    if isinstance(body, dict) and body.get("ok") is False:
+        desc = str(body.get("description") or "unknown Telegram API error")
+        code = body.get("error_code")
+        raise requests.RequestException(f"Telegram API error ({code}): {desc}")
+
+
 class TelegramPublisher:
     def __init__(self, bot_token: Optional[str], chat_id: Optional[str]):
         self.bot_token = bot_token
@@ -26,7 +38,7 @@ class TelegramPublisher:
             "disable_web_page_preview": False,
         }
         resp = requests.post(url, json=payload, timeout=30)
-        resp.raise_for_status()
+        _ensure_telegram_ok(resp)
 
     def _send_photo(self, message: str, image_url: str) -> None:
         # Telegram caption is limited to 1024 characters.
@@ -41,7 +53,7 @@ class TelegramPublisher:
             "parse_mode": "HTML",
         }
         resp = requests.post(url, json=payload, timeout=30)
-        resp.raise_for_status()
+        _ensure_telegram_ok(resp)
 
     def _send_photo_upload(self, message: str, image_url: str) -> None:
         caption = message
@@ -64,7 +76,7 @@ class TelegramPublisher:
             "photo": ("image.jpg", image_resp.content, content_type),
         }
         resp = requests.post(tg_url, data=data, files=files, timeout=30)
-        resp.raise_for_status()
+        _ensure_telegram_ok(resp)
 
     def publish(self, message: str, image_url: Optional[str] = None) -> None:
         if not self.enabled:

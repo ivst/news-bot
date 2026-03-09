@@ -4,7 +4,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/news-bot}"
 APP_USER="${APP_USER:-news-bot}"
 SERVICE="${SERVICE:-}"
-BRANCH="${BRANCH:-master}"
+BRANCH="${BRANCH:-main}"
 TEMPLATE_GLOB="${TEMPLATE_GLOB:-news-bot@*.service}"
 
 cd "$APP_DIR"

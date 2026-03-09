@@ -107,7 +107,7 @@ def _normalize_for_similarity(text: str) -> str:
     for pattern, replacement in _ENTITY_CANON_PATTERNS:
         text = pattern.sub(replacement, text)
     text = re.sub(r"https?://\S+", " ", text)
-    text = re.sub(r"[^0-9a-zа-яё\s]", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"[^0-9a-zа-яё\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\s]", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -277,13 +277,18 @@ def _is_channel_active(active_hours: str | None, now_local: datetime) -> bool:
     if not active_hours:
         return True
     raw = active_hours.strip()
-    m = re.fullmatch(r"([01]?\d|2[0-3])\s*-\s*([01]?\d|2[0-3])", raw)
+    m = re.fullmatch(r"(\d{1,2})\s*-\s*(\d{1,2})", raw)
     if not m:
-        logger.warning("Invalid active hours format '%s'. Expected HH-HH (e.g. 10-18). Channel stays active.", raw)
+        logger.warning("Invalid active hours format '%s'. Expected HH-HH (e.g. 10-18 or 0-24). Channel stays active.", raw)
         return True
     start = int(m.group(1))
     end = int(m.group(2))
+    if not (0 <= start <= 23 and 0 <= end <= 24):
+        logger.warning("Invalid active hours value '%s'. Hours must be in 0..23 for start and 0..24 for end.", raw)
+        return True
     hour = now_local.hour
+    if start == 0 and end == 24:
+        return True
     if start == end:
         return True
     if start < end:
