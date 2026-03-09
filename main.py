@@ -7,7 +7,8 @@ import re
 import time
 import unicodedata
 from difflib import SequenceMatcher
-from datetime import timezone
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -214,9 +215,30 @@ def build_vk_message(title: str, summary: str) -> str:
     return msg
 
 
+def _is_channel_active(active_hours: str | None, now_local: datetime) -> bool:
+    if not active_hours:
+        return True
+    raw = active_hours.strip()
+    m = re.fullmatch(r"([01]?\d|2[0-3])\s*-\s*([01]?\d|2[0-3])", raw)
+    if not m:
+        logger.warning("Invalid active hours format '%s'. Expected HH-HH (e.g. 10-18). Channel stays active.", raw)
+        return True
+    start = int(m.group(1))
+    end = int(m.group(2))
+    hour = now_local.hour
+    if start == end:
+        return True
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
+
+
 def job() -> None:
     settings = load_settings()
     duplicate_action = settings.duplicate_action if settings.duplicate_action in {"skip", "draft"} else "skip"
+    now_local = datetime.now(ZoneInfo(settings.timezone))
+    tg_active = _is_channel_active(settings.telegram_active_hours, now_local)
+    vk_active = _is_channel_active(settings.vk_active_hours, now_local)
 
     if not settings.rss_urls:
         logger.error("RSS_URLS is empty. Nothing to fetch.")
@@ -248,6 +270,20 @@ def job() -> None:
         draft_mode=settings.vk_draft_mode,
         draft_delay_minutes=settings.vk_draft_delay_minutes,
     )
+    if tg.enabled and not tg_active:
+        logger.info(
+            "Telegram publishing is outside active hours (%s). Current time: %02d:%02d",
+            settings.telegram_active_hours,
+            now_local.hour,
+            now_local.minute,
+        )
+    if vk.enabled and not vk_active:
+        logger.info(
+            "VK publishing is outside active hours (%s). Current time: %02d:%02d",
+            settings.vk_active_hours,
+            now_local.hour,
+            now_local.minute,
+        )
 
     news = fetch_news(
         settings.rss_urls,
@@ -265,9 +301,9 @@ def job() -> None:
             break
 
         channels: list[tuple[str, object]] = []
-        if tg.enabled and not store.is_seen("telegram", item.link):
+        if tg.enabled and tg_active and not store.is_seen("telegram", item.link):
             channels.append(("telegram", tg))
-        if vk.enabled and not vk_daily_limit_reached and not store.is_seen("vk", item.link):
+        if vk.enabled and vk_active and not vk_daily_limit_reached and not store.is_seen("vk", item.link):
             channels.append(("vk", vk))
         if not channels:
             continue

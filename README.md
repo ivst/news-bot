@@ -65,7 +65,9 @@ docker compose logs -f
 Copy `.env.example` to `.env` and fill in:
 - `TARGET_TOPIC` - topic to collect (for example `world news`, `AI`, `fintech`).
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` for Telegram.
+- `TELEGRAM_ACTIVE_HOURS=` - active publish window for Telegram in local `TIMEZONE` (`HH-HH`, for example `10-18`; empty by default means 24/7).
 - `VK_GROUP_ID`, `VK_ACCESS_TOKEN` for VK.
+- `VK_ACTIVE_HOURS=` - active publish window for VK in local `TIMEZONE` (`HH-HH`, for example `10-18`; empty by default means 24/7).
 - `VK_PHOTO_UPLOAD_ENABLED=true` - upload photos to VK via API (requires user token with `photos` scope).
 - `VK_DRAFT_MODE=false` - create postponed VK posts instead of immediate publishing.
 - `VK_DRAFT_DELAY_MINUTES=43200` - postpone delay in minutes (default 30 days).
