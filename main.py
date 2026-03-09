@@ -533,6 +533,12 @@ def job() -> None:
                     "show_source": settings.vk_show_source if channel_name == "vk" else settings.telegram_show_source,
                     "is_duplicate": is_duplicate,
                     "duplicate_reason": duplicate_reason if is_duplicate else "",
+                    "dedup": {
+                        "event_key": dedup_key,
+                        "event_tokens": dedup_tokens,
+                        "dedup_version": dedup_version,
+                        "text_norm": text_norm,
+                    },
                 }
                 hub.create_job(item_id=item_id, channel=channel_name, payload_snapshot=payload_snapshot)
                 return True
