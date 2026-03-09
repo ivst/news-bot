@@ -21,9 +21,11 @@ class Settings:
     telegram_bot_token: str | None
     telegram_chat_id: str | None
     telegram_active_hours: str | None
+    telegram_show_source: bool
     vk_group_id: str | None
     vk_access_token: str | None
     vk_active_hours: str | None
+    vk_show_source: bool
     vk_photo_upload_enabled: bool
     vk_draft_mode: bool
     vk_draft_delay_minutes: int
@@ -81,9 +83,11 @@ def load_settings() -> Settings:
         telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN") or None,
         telegram_chat_id=os.getenv("TELEGRAM_CHAT_ID") or None,
         telegram_active_hours=(os.getenv("TELEGRAM_ACTIVE_HOURS") or "").strip() or None,
+        telegram_show_source=_to_bool(os.getenv("TELEGRAM_SHOW_SOURCE"), default=True),
         vk_group_id=os.getenv("VK_GROUP_ID") or None,
         vk_access_token=os.getenv("VK_ACCESS_TOKEN") or None,
         vk_active_hours=(os.getenv("VK_ACTIVE_HOURS") or "").strip() or None,
+        vk_show_source=_to_bool(os.getenv("VK_SHOW_SOURCE"), default=True),
         vk_photo_upload_enabled=_to_bool(os.getenv("VK_PHOTO_UPLOAD_ENABLED"), default=True),
         vk_draft_mode=_to_bool(os.getenv("VK_DRAFT_MODE"), default=False),
         vk_draft_delay_minutes=max(10, int(os.getenv("VK_DRAFT_DELAY_MINUTES", "43200"))),

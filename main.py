@@ -199,18 +199,21 @@ def _find_event_duplicate_recent(
     return False, None, curr_key
 
 
-def build_telegram_message(title: str, summary: str, link: str) -> str:
+def build_telegram_message(title: str, summary: str, link: str, include_source: bool = True) -> str:
     safe_title = html.escape(title)
     safe_summary = html.escape(summary)
     safe_link = html.escape(link, quote=True)
-    msg = f"<b>{safe_title}</b>\n\n{safe_summary}\n\n<a href=\"{safe_link}\">Источник</a>"
+    if include_source:
+        msg = f"<b>{safe_title}</b>\n\n{safe_summary}\n\n<a href=\"{safe_link}\">Источник</a>"
+    else:
+        msg = f"<b>{safe_title}</b>\n\n{safe_summary}"
     if len(msg) > 3900:
         msg = msg[:3890].rsplit(" ", 1)[0] + "..."
     return msg
 
 
-def build_vk_message(title: str, summary: str) -> str:
-    msg = f"{title}\n\n{summary}\n\nИсточник"
+def build_vk_message(title: str, summary: str, include_source: bool = True) -> str:
+    msg = f"{title}\n\n{summary}\n\nИсточник" if include_source else f"{title}\n\n{summary}"
     if len(msg) > 3900:
         msg = msg[:3890].rsplit(" ", 1)[0] + "..."
     return msg
@@ -407,8 +410,13 @@ def job() -> None:
         if settings.short_links_enabled:
             publish_link = shorten_url(item.link, settings.shortener_provider)
         summary = _normalize_summary(summary, settings.summary_max_lines)
-        tg_message = strip_ui_noise(build_telegram_message(title, summary, item.link))
-        vk_message = strip_ui_noise(build_vk_message(title, summary))
+        tg_message = strip_ui_noise(
+            build_telegram_message(title, summary, item.link, include_source=settings.telegram_show_source)
+        )
+        vk_message = strip_ui_noise(build_vk_message(title, summary, include_source=settings.vk_show_source))
+        hub_tg_message = strip_ui_noise(build_telegram_message(title, summary, item.link, include_source=False))
+        hub_vk_message = strip_ui_noise(build_vk_message(title, summary, include_source=False))
+        vk_source_link = publish_link if settings.vk_show_source else None
         text_norm = _text_norm_for_similarity(title, summary)
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
         hub_sync_ok = False
@@ -433,7 +441,8 @@ def job() -> None:
                             "source_link": item.link,
                             "short_link": publish_link,
                             "image_url": item.image_url,
-                            "message": vk_message if channel_name == "vk" else tg_message,
+                            "message": hub_vk_message if channel_name == "vk" else hub_tg_message,
+                            "show_source": settings.vk_show_source if channel_name == "vk" else settings.telegram_show_source,
                         }
                         hub.create_job(item_id=item_id, channel=channel_name, payload_snapshot=payload_snapshot)
                 hub_sync_ok = item_id is not None
@@ -484,7 +493,7 @@ def job() -> None:
                             publisher.publish(
                                 vk_message,
                                 attachment_link=item.link,
-                                source_link=publish_link,
+                                source_link=vk_source_link,
                                 image_url=item.image_url,
                                 force_draft=True,
                             )
@@ -554,7 +563,7 @@ def job() -> None:
                             publisher.publish(
                                 vk_message,
                                 attachment_link=item.link,
-                                source_link=publish_link,
+                                source_link=vk_source_link,
                                 image_url=item.image_url,
                                 force_draft=True,
                             )
@@ -608,7 +617,7 @@ def job() -> None:
                     publisher.publish(
                         vk_message,
                         attachment_link=item.link,
-                        source_link=publish_link,
+                        source_link=vk_source_link,
                         image_url=item.image_url,
                     )
                 else:
