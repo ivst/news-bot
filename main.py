@@ -296,6 +296,19 @@ def job() -> None:
     published_items = 0
     published_posts = 0
     vk_daily_limit_reached = False
+    vk_daily_post_limit = max(0, settings.vk_daily_post_limit)
+    vk_published_today = 0
+    if vk_daily_post_limit > 0:
+        day_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_start_utc = day_start_local.astimezone(timezone.utc)
+        vk_published_today = store.count_published_attempts_since("vk", day_start_utc.isoformat())
+        if vk.enabled and vk_active and vk_published_today >= vk_daily_post_limit:
+            vk_daily_limit_reached = True
+            logger.info(
+                "Configured VK daily post limit already reached (%s/%s). VK publishing disabled until next run.",
+                vk_published_today,
+                vk_daily_post_limit,
+            )
     for item in news:
         if published_items >= settings.max_news_per_run:
             break
@@ -427,6 +440,16 @@ def job() -> None:
                                 reason=f"event_duplicate;matched:{match_link or ''};event_key:{event_key}",
                             )
                             published_posts += 1
+                            if channel_name == "vk" and vk_daily_post_limit > 0:
+                                vk_published_today += 1
+                                if vk_published_today >= vk_daily_post_limit:
+                                    vk_daily_limit_reached = True
+                                    logger.info(
+                                        "Configured VK daily post limit reached (%s/%s). "
+                                        "VK publishing is disabled until next run.",
+                                        vk_published_today,
+                                        vk_daily_post_limit,
+                                    )
                             item_has_success = True
                             time.sleep(1)
                             continue
@@ -488,6 +511,16 @@ def job() -> None:
                                 similarity=score,
                             )
                             published_posts += 1
+                            if channel_name == "vk" and vk_daily_post_limit > 0:
+                                vk_published_today += 1
+                                if vk_published_today >= vk_daily_post_limit:
+                                    vk_daily_limit_reached = True
+                                    logger.info(
+                                        "Configured VK daily post limit reached (%s/%s). "
+                                        "VK publishing is disabled until next run.",
+                                        vk_published_today,
+                                        vk_daily_post_limit,
+                                    )
                             item_has_success = True
                             time.sleep(1)
                             continue
@@ -531,6 +564,16 @@ def job() -> None:
                     status="published",
                 )
                 published_posts += 1
+                if channel_name == "vk" and vk_daily_post_limit > 0:
+                    vk_published_today += 1
+                    if vk_published_today >= vk_daily_post_limit:
+                        vk_daily_limit_reached = True
+                        logger.info(
+                            "Configured VK daily post limit reached (%s/%s). "
+                            "VK publishing is disabled until next run.",
+                            vk_published_today,
+                            vk_daily_post_limit,
+                        )
                 item_has_success = True
                 logger.info("Published to %s: %s", channel_name, item.link)
                 time.sleep(1)

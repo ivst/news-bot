@@ -140,6 +140,20 @@ class SeenNewsStore:
             ).fetchall()
             return [(str(r[0]), str(r[1]), str(r[2])) for r in rows]
 
+    def count_published_attempts_since(self, channel: str, since_iso: str) -> int:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(1)
+                FROM post_attempts
+                WHERE channel = ?
+                  AND status IN ('published', 'published_draft_duplicate')
+                  AND created_at >= ?
+                """,
+                (channel, since_iso),
+            ).fetchone()
+            return int(row[0]) if row and row[0] is not None else 0
+
     def record_attempt(
         self,
         *,

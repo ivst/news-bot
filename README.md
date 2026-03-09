@@ -71,6 +71,7 @@ Copy `.env.example` to `.env` and fill in:
 - `VK_PHOTO_UPLOAD_ENABLED=true` - upload photos to VK via API (requires user token with `photos` scope).
 - `VK_DRAFT_MODE=false` - create postponed VK posts instead of immediate publishing.
 - `VK_DRAFT_DELAY_MINUTES=43200` - postpone delay in minutes (default 30 days).
+- `VK_DAILY_POST_LIMIT=0` - VK posts per local day cap (`0` = unlimited, `100`/`200` = hard app-side cap).
 - `TARGET_LANGUAGE=ru` or another language code.
 - `SCHEDULE_CRON` in cron format (default: every 30 minutes).
 - `NEWS_MAX_AGE_DAYS=1` - only consider news not older than N days.

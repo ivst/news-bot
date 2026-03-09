@@ -71,6 +71,7 @@ docker compose logs -f
 - `VK_PHOTO_UPLOAD_ENABLED=true` - загружать фото в VK через API (нужен user token с правом `photos`).
 - `VK_DRAFT_MODE=false` - создавать отложенные посты VK вместо немедленной публикации.
 - `VK_DRAFT_DELAY_MINUTES=43200` - задержка отложенной публикации в минутах (по умолчанию 30 дней).
+- `VK_DAILY_POST_LIMIT=0` - лимит постов VK в сутки по локальной `TIMEZONE` (`0` = без лимита, `100`/`200` = жесткий лимит на стороне приложения).
 - `TARGET_LANGUAGE=ru` или другой код языка.
 - `SCHEDULE_CRON` в формате cron (по умолчанию каждые 30 минут).
 - `NEWS_MAX_AGE_DAYS=1` - учитывать только новости не старше N дней.
