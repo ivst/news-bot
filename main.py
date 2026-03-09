@@ -16,7 +16,7 @@ from src.config import load_settings
 from src.feeds import fetch_news
 from src.link_shortener import shorten_url
 from src.publishers.telegram import TelegramPublisher
-from src.publishers.vk import VKPublisher
+from src.publishers.vk import VKDailyPostLimitError, VKPublisher
 from src.storage import SeenNewsStore
 from src.summarizer import summarize_text
 from src.text_cleaner import strip_ui_noise
@@ -259,6 +259,7 @@ def job() -> None:
 
     published_items = 0
     published_posts = 0
+    vk_daily_limit_reached = False
     for item in news:
         if published_items >= settings.max_news_per_run:
             break
@@ -266,7 +267,7 @@ def job() -> None:
         channels: list[tuple[str, object]] = []
         if tg.enabled and not store.is_seen("telegram", item.link):
             channels.append(("telegram", tg))
-        if vk.enabled and not store.is_seen("vk", item.link):
+        if vk.enabled and not vk_daily_limit_reached and not store.is_seen("vk", item.link):
             channels.append(("vk", vk))
         if not channels:
             continue
@@ -497,6 +498,21 @@ def job() -> None:
                 item_has_success = True
                 logger.info("Published to %s: %s", channel_name, item.link)
                 time.sleep(1)
+            except VKDailyPostLimitError as ex:
+                logger.warning(
+                    "VK daily post limit reached (error_code=214). VK publishing is disabled until next run. Link: %s",
+                    item.link,
+                )
+                vk_daily_limit_reached = True
+                store.record_attempt(
+                    channel=channel_name,
+                    link=item.link,
+                    title=title,
+                    summary=summary,
+                    text_norm=text_norm,
+                    status="publish_deferred_daily_limit",
+                    reason=str(ex)[:500],
+                )
             except Exception as ex:
                 logger.exception("Publish failed for %s (%s): %s", item.link, channel_name, ex)
                 store.record_attempt(

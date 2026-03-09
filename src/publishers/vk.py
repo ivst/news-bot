@@ -15,6 +15,10 @@ from PIL import Image
 logger = logging.getLogger("news-bot.vk")
 
 
+class VKDailyPostLimitError(RuntimeError):
+    """Raised when VK wall.post daily quota is exhausted (error_code=214)."""
+
+
 class VKPublisher:
     API_VERSION = "5.199"
     API_BASE = "https://api.vk.com/method"
@@ -296,6 +300,8 @@ class VKPublisher:
         body = self._wall_post(payload)
         if "error" in body:
             code, msg = self._extract_error(body)
+            if code == 214:
+                raise VKDailyPostLimitError(f"VK API error: {body['error']}")
             # Some links cannot be used as attachment previews in VK.
             if payload.get("attachments") and code == 100 and "link_photo_sizing_rule" in msg and attachment_link:
                 fallback_payload = dict(payload)
@@ -308,6 +314,9 @@ class VKPublisher:
                     fallback_payload["message"] = self._inject_source_link(message, source_link)
                 fallback_body = self._wall_post(fallback_payload)
                 if "error" in fallback_body:
+                    fallback_code, _ = self._extract_error(fallback_body)
+                    if fallback_code == 214:
+                        raise VKDailyPostLimitError(f"VK API error: {fallback_body['error']}")
                     raise RuntimeError(f"VK API error: {fallback_body['error']}")
                 return
             raise RuntimeError(f"VK API error: {body['error']}")
