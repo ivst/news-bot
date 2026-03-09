@@ -171,7 +171,7 @@ chmod +x scripts/update_service.sh
 
 Опциональные переопределения через переменные окружения:
 ```bash
-APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=main ./scripts/update_service.sh
+APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts/update_service.sh
 ```
 
 Примеры для шаблонных инстансов:

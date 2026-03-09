@@ -171,7 +171,7 @@ Script behavior:
 
 Optional environment overrides:
 ```bash
-APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=main ./scripts/update_service.sh
+APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts/update_service.sh
 ```
 
 Examples for template instances:
