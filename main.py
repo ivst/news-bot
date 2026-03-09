@@ -276,6 +276,11 @@ def job() -> None:
         api_key=settings.hub_api_key,
         timeout_seconds=settings.hub_timeout_seconds,
     )
+    if not settings.direct_publish_enabled and not settings.hub_enabled:
+        logger.warning(
+            "DIRECT_PUBLISH_ENABLED=false and HUB_ENABLED=false: no publication path configured. "
+            "Nothing will be delivered."
+        )
     if tg.enabled and not tg_active:
         logger.info(
             "Telegram publishing is outside active hours (%s). Current time: %02d:%02d",
@@ -405,6 +410,8 @@ def job() -> None:
         tg_message = strip_ui_noise(build_telegram_message(title, summary, item.link))
         vk_message = strip_ui_noise(build_vk_message(title, summary))
         text_norm = _text_norm_for_similarity(title, summary)
+        published_at = item.published_at.astimezone(timezone.utc).isoformat()
+        hub_sync_ok = False
         if settings.hub_enabled:
             try:
                 idempotency_key = HubClient.build_idempotency_key(item.link)
@@ -429,11 +436,31 @@ def job() -> None:
                             "message": vk_message if channel_name == "vk" else tg_message,
                         }
                         hub.create_job(item_id=item_id, channel=channel_name, payload_snapshot=payload_snapshot)
+                hub_sync_ok = item_id is not None
             except Exception as ex:
                 logger.warning("Hub sync failed for %s: %s", item.link, ex)
 
+        if not settings.direct_publish_enabled:
+            if settings.hub_enabled and hub_sync_ok:
+                for channel_name, _ in channels:
+                    store.mark_seen(channel_name, item.link, published_at)
+                    store.record_attempt(
+                        channel=channel_name,
+                        link=item.link,
+                        title=title,
+                        summary=summary,
+                        text_norm=text_norm,
+                        status="queued_in_hub",
+                    )
+                if channels:
+                    item_has_success = True
+                    published_items += 1
+                    logger.info("Queued to hub only (%s channel(s)): %s", len(channels), item.link)
+            elif settings.hub_enabled and not hub_sync_ok:
+                logger.warning("Hub-only mode: delivery skipped due to hub sync failure: %s", item.link)
+            continue
+
         item_has_success = False
-        published_at = item.published_at.astimezone(timezone.utc).isoformat()
         for channel_name, publisher in channels:
             try:
                 if settings.event_tag_dedup_enabled:

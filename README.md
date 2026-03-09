@@ -91,6 +91,7 @@ Copy `.env.example` to `.env` and fill in:
 - `SIMILAR_DEDUP_TOKEN_THRESHOLD=0.72` - token Jaccard threshold (0..1) for near-duplicate detection.
 - `SIMILAR_DEDUP_MIN_OVERLAP_TOKENS=6` - minimal number of overlapping tokens for token-based dedup.
 - `HUB_ENABLED=false`, `HUB_BASE_URL`, `HUB_API_KEY`, `HUB_TIMEOUT_SECONDS=15`, `HUB_CREATE_JOBS=true` - forward prepared items and channel jobs to external `news-hub` API.
+- `DIRECT_PUBLISH_ENABLED=true` - keep direct Telegram/VK publishing enabled. Set `false` to run in `hub-only` mode (delivery only via `news-hub`).
 
 ### LLM (OpenAI or DeepSeek)
 - `LLM_API_KEY` - provider API key.
