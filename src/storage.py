@@ -61,13 +61,25 @@ class SeenNewsStore:
                     status TEXT NOT NULL,
                     reason TEXT,
                     similarity REAL,
+                    event_key TEXT,
+                    event_tokens TEXT,
+                    dedup_version TEXT,
                     created_at TEXT NOT NULL
                 )
                 """
             )
+            # Backward-compatible additive migration for existing DBs.
+            cols = {str(r[1]) for r in conn.execute("PRAGMA table_info(post_attempts)").fetchall()}
+            if "event_key" not in cols:
+                conn.execute("ALTER TABLE post_attempts ADD COLUMN event_key TEXT")
+            if "event_tokens" not in cols:
+                conn.execute("ALTER TABLE post_attempts ADD COLUMN event_tokens TEXT")
+            if "dedup_version" not in cols:
+                conn.execute("ALTER TABLE post_attempts ADD COLUMN dedup_version TEXT")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_post_attempts_channel_created ON post_attempts (channel, created_at DESC)"
             )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_post_attempts_event_key ON post_attempts (channel, event_key)")
             conn.commit()
 
     def is_seen(self, channel: str, link: str) -> bool:
@@ -165,15 +177,31 @@ class SeenNewsStore:
         status: str,
         reason: str | None = None,
         similarity: float | None = None,
+        event_key: str | None = None,
+        event_tokens: str | None = None,
+        dedup_version: str | None = None,
     ) -> None:
         created_at = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO post_attempts (
-                    channel, link, title, summary, text_norm, status, reason, similarity, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    channel, link, title, summary, text_norm, status, reason, similarity, event_key, event_tokens, dedup_version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (channel, link, title, summary, text_norm, status, reason, similarity, created_at),
+                (
+                    channel,
+                    link,
+                    title,
+                    summary,
+                    text_norm,
+                    status,
+                    reason,
+                    similarity,
+                    event_key,
+                    event_tokens,
+                    dedup_version,
+                    created_at,
+                ),
             )
             conn.commit()

@@ -81,6 +81,7 @@ _ENTITY_CANON_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bdaisuke\b", flags=re.IGNORECASE), "дайсукэ"),
     (re.compile(r"\bсакума\b", flags=re.IGNORECASE), "сакума"),
 ]
+_DEDUP_VERSION = "event-v2"
 
 
 def _normalize_title(title: str) -> str:
@@ -161,6 +162,12 @@ def _event_overlap(a: set[str], b: set[str]) -> tuple[float, int]:
     if denom == 0:
         return 0.0, overlap
     return overlap / denom, overlap
+
+
+def _dedup_snapshot(title: str, summary: str, min_tokens: int) -> tuple[str, str, str]:
+    event_key = _event_key(title, summary, min_tokens) or ""
+    event_tokens = " ".join(sorted(_event_token_set(title, summary)))
+    return event_key, event_tokens, _DEDUP_VERSION
 
 
 def _similarity_ratio(a: str, b: str) -> float:
@@ -287,6 +294,7 @@ def _is_channel_active(active_hours: str | None, now_local: datetime) -> bool:
 def job() -> None:
     settings = load_settings()
     duplicate_action = settings.duplicate_action if settings.duplicate_action in {"skip", "draft"} else "skip"
+    dedup_min_tokens = max(2, settings.event_tag_dedup_min_tokens)
     now_local = datetime.now(ZoneInfo(settings.timezone))
     tg_active = _is_channel_active(settings.telegram_active_hours, now_local)
     vk_active = _is_channel_active(settings.vk_active_hours, now_local)
@@ -385,6 +393,7 @@ def job() -> None:
         if settings.require_image_for_publish and not item.image_url:
             logger.info("Skipped (image required but missing): %s", item.link)
             published_at = item.published_at.astimezone(timezone.utc).isoformat()
+            dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(item.title, "", dedup_min_tokens)
             for channel_name, _ in channels:
                 store.record_attempt(
                     channel=channel_name,
@@ -394,6 +403,9 @@ def job() -> None:
                     text_norm="",
                     status="rejected_no_image",
                     reason="image_required",
+                    event_key=dedup_key,
+                    event_tokens=dedup_tokens,
+                    dedup_version=dedup_version,
                 )
                 store.mark_seen(channel_name, item.link, published_at)
             continue
@@ -409,6 +421,7 @@ def job() -> None:
         )
         if not translated:
             logger.warning("Skipped (translation failed for body): %s", item.link)
+            dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(item.title, "", dedup_min_tokens)
             for channel_name, _ in channels:
                 store.record_attempt(
                     channel=channel_name,
@@ -418,6 +431,9 @@ def job() -> None:
                     text_norm="",
                     status="rejected_translation_failed",
                     reason="body_translation_failed",
+                    event_key=dedup_key,
+                    event_tokens=dedup_tokens,
+                    dedup_version=dedup_version,
                 )
             continue
         translated = strip_ui_noise(translated)
@@ -441,6 +457,7 @@ def job() -> None:
         )
         if not title:
             logger.warning("Skipped (translation failed for title): %s", item.link)
+            dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(item.title, summary, dedup_min_tokens)
             for channel_name, _ in channels:
                 store.record_attempt(
                     channel=channel_name,
@@ -450,6 +467,9 @@ def job() -> None:
                     text_norm="",
                     status="rejected_translation_failed",
                     reason="title_translation_failed",
+                    event_key=dedup_key,
+                    event_tokens=dedup_tokens,
+                    dedup_version=dedup_version,
                 )
             continue
         title = _normalize_title(strip_ui_noise(title))
@@ -457,6 +477,7 @@ def job() -> None:
         if settings.short_links_enabled:
             publish_link = shorten_url(item.link, settings.shortener_provider)
         summary = _normalize_summary(summary, settings.summary_max_lines)
+        dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(title, summary, dedup_min_tokens)
         tg_message = strip_ui_noise(
             build_telegram_message(title, summary, item.link, include_source=settings.telegram_show_source)
         )
@@ -536,6 +557,9 @@ def job() -> None:
                             summary=summary,
                             text_norm=text_norm,
                             status="queued_in_hub",
+                            event_key=dedup_key,
+                            event_tokens=dedup_tokens,
+                            dedup_version=dedup_version,
                         )
                         item_has_success = True
                     else:
@@ -576,6 +600,9 @@ def job() -> None:
                                 text_norm=text_norm,
                                 status="published_draft_duplicate",
                                 reason=f"event_duplicate;matched:{match_link or ''};event_key:{event_key}",
+                                event_key=dedup_key,
+                                event_tokens=dedup_tokens,
+                                dedup_version=dedup_version,
                             )
                             published_posts += 1
                             if channel_name == "vk" and vk_daily_post_limit > 0:
@@ -606,6 +633,9 @@ def job() -> None:
                             text_norm=text_norm,
                             status="rejected_event_duplicate",
                             reason=f"matched:{match_link or ''};event_key:{event_key}",
+                            event_key=dedup_key,
+                            event_tokens=dedup_tokens,
+                            dedup_version=dedup_version,
                         )
                         if settings.hub_send_duplicates:
                             queue_hub_job(
@@ -653,6 +683,9 @@ def job() -> None:
                                 status="published_draft_duplicate",
                                 reason=f"similar_duplicate;matched:{match_link or ''};{similarity_reason}",
                                 similarity=score,
+                                event_key=dedup_key,
+                                event_tokens=dedup_tokens,
+                                dedup_version=dedup_version,
                             )
                             published_posts += 1
                             if channel_name == "vk" and vk_daily_post_limit > 0:
@@ -685,6 +718,9 @@ def job() -> None:
                             status="rejected_similar",
                             reason=f"matched:{match_link or ''};{similarity_reason}",
                             similarity=score,
+                            event_key=dedup_key,
+                            event_tokens=dedup_tokens,
+                            dedup_version=dedup_version,
                         )
                         if settings.hub_send_duplicates:
                             queue_hub_job(
@@ -712,6 +748,9 @@ def job() -> None:
                     summary=summary,
                     text_norm=text_norm,
                     status="published",
+                    event_key=dedup_key,
+                    event_tokens=dedup_tokens,
+                    dedup_version=dedup_version,
                 )
                 published_posts += 1
                 if channel_name == "vk" and vk_daily_post_limit > 0:
@@ -741,6 +780,9 @@ def job() -> None:
                     text_norm=text_norm,
                     status="publish_deferred_daily_limit",
                     reason=str(ex)[:500],
+                    event_key=dedup_key,
+                    event_tokens=dedup_tokens,
+                    dedup_version=dedup_version,
                 )
             except Exception as ex:
                 logger.exception("Publish failed for %s (%s): %s", item.link, channel_name, ex)
@@ -752,6 +794,9 @@ def job() -> None:
                     text_norm=text_norm,
                     status="publish_failed",
                     reason=str(ex)[:500],
+                    event_key=dedup_key,
+                    event_tokens=dedup_tokens,
+                    dedup_version=dedup_version,
                 )
 
         if item_has_success:
