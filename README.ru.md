@@ -92,7 +92,7 @@ docker compose logs -f
 - `SIMILAR_DEDUP_THRESHOLD=0.90` - порог похожести (0..1).
 - `SIMILAR_DEDUP_TOKEN_THRESHOLD=0.72` - порог токенного Jaccard-сходства (0..1) для поиска близких дублей.
 - `SIMILAR_DEDUP_MIN_OVERLAP_TOKENS=6` - минимальное число общих токенов для токенного дедупа.
-- `HUB_ENABLED=false`, `HUB_BASE_URL`, `HUB_API_KEY`, `HUB_TIMEOUT_SECONDS=15`, `HUB_CREATE_JOBS=true` - отправлять подготовленные материалы и задания каналов во внешний `news-hub` API.
+- `HUB_ENABLED=false`, `HUB_BASE_URL`, `HUB_API_KEY`, `HUB_TIMEOUT_SECONDS=15`, `HUB_CREATE_JOBS=true`, `HUB_SEND_DUPLICATES=false` - отправлять подготовленные материалы и задания каналов во внешний `news-hub` API; задачи-дубли передаются только при включении флага.
 - `DIRECT_PUBLISH_ENABLED=true` - сохранять прямую публикацию в Telegram/VK. Установите `false`, чтобы работать в режиме `hub-only` (доставка только через `news-hub`).
 
 ### LLM (OpenAI или DeepSeek)

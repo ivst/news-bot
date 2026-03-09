@@ -57,7 +57,30 @@ _EVENT_STOPWORDS = {
     "under",
     "если",
     "also",
+    "участник",
+    "группа",
+    "появился",
+    "появится",
+    "эфире",
+    "программа",
+    "примут",
+    "участие",
+    "расскажут",
+    "детстве",
+    "жизнью",
+    "сегодня",
+    "tokyo",
+    "television",
+    "nippon",
 }
+
+_ENTITY_CANON_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\bsnow\s*man\b", flags=re.IGNORECASE), "snowman"),
+    (re.compile(r"\bсноу\s*ман\b", flags=re.IGNORECASE), "snowman"),
+    (re.compile(r"\bдайсук[еэ]\b", flags=re.IGNORECASE), "дайсукэ"),
+    (re.compile(r"\bdaisuke\b", flags=re.IGNORECASE), "дайсукэ"),
+    (re.compile(r"\bсакума\b", flags=re.IGNORECASE), "сакума"),
+]
 
 
 def _normalize_title(title: str) -> str:
@@ -80,6 +103,8 @@ def _normalize_summary(summary: str, max_lines: int) -> str:
 def _normalize_for_similarity(text: str) -> str:
     text = text.lower()
     text = unicodedata.normalize("NFKC", text)
+    for pattern, replacement in _ENTITY_CANON_PATTERNS:
+        text = pattern.sub(replacement, text)
     text = re.sub(r"https?://\S+", " ", text)
     text = re.sub(r"[^0-9a-zа-яё\s]", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text).strip()
@@ -119,6 +144,23 @@ def _event_key(title: str, summary: str, min_tokens: int) -> str:
         return ""
     digest = hashlib.sha1(" ".join(uniq).encode("utf-8")).hexdigest()
     return digest[:16]
+
+
+def _event_token_set(title: str, summary: str) -> set[str]:
+    base = _normalize_for_similarity(f"{title} {summary}")
+    if not base:
+        return set()
+    return set(_event_tokens(base))
+
+
+def _event_overlap(a: set[str], b: set[str]) -> tuple[float, int]:
+    if not a or not b:
+        return 0.0, 0
+    overlap = len(a & b)
+    denom = max(len(a), len(b))
+    if denom == 0:
+        return 0.0, overlap
+    return overlap / denom, overlap
 
 
 def _similarity_ratio(a: str, b: str) -> float:
@@ -190,12 +232,17 @@ def _find_event_duplicate_recent(
     min_tokens: int,
 ) -> tuple[bool, str | None, str]:
     curr_key = _event_key(title, summary, min_tokens)
-    if not curr_key:
+    curr_tokens = _event_token_set(title, summary)
+    if not curr_key and not curr_tokens:
         return False, None, ""
     for old_title, old_summary, old_link in store.get_published_attempts_since(channel, window_days):
         old_key = _event_key(old_title, old_summary, min_tokens)
         if old_key and old_key == curr_key:
             return True, old_link, curr_key
+        old_tokens = _event_token_set(old_title, old_summary)
+        score, overlap = _event_overlap(curr_tokens, old_tokens)
+        if overlap >= max(3, min_tokens - 1) and score >= 0.60:
+            return True, old_link, f"{curr_key or '-'};event_overlap:{score:.3f};common:{overlap}"
     return False, None, curr_key
 
 
@@ -419,11 +466,20 @@ def job() -> None:
         vk_source_link = publish_link if settings.vk_show_source else None
         text_norm = _text_norm_for_similarity(title, summary)
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
-        hub_sync_ok = False
-        if settings.hub_enabled:
+        hub_item_id: int | None = None
+        hub_item_ingest_failed = False
+
+        def ensure_hub_item() -> int | None:
+            nonlocal hub_item_id, hub_item_ingest_failed
+            if not settings.hub_enabled:
+                return None
+            if hub_item_id is not None:
+                return hub_item_id
+            if hub_item_ingest_failed:
+                return None
             try:
                 idempotency_key = HubClient.build_idempotency_key(item.link)
-                item_id = hub.ingest_item(
+                hub_item_id = hub.ingest_item(
                     idempotency_key=idempotency_key,
                     source_link=item.link,
                     source_title=item.title,
@@ -435,43 +491,57 @@ def job() -> None:
                     image_url=item.image_url,
                     suggested_channels=[channel_name for channel_name, _ in channels],
                 )
-                if item_id is not None and settings.hub_create_jobs:
-                    for channel_name, _ in channels:
-                        payload_snapshot = {
-                            "source_link": item.link,
-                            "short_link": publish_link,
-                            "image_url": item.image_url,
-                            "message": hub_vk_message if channel_name == "vk" else hub_tg_message,
-                            "show_source": settings.vk_show_source if channel_name == "vk" else settings.telegram_show_source,
-                        }
-                        hub.create_job(item_id=item_id, channel=channel_name, payload_snapshot=payload_snapshot)
-                hub_sync_ok = item_id is not None
+                return hub_item_id
             except Exception as ex:
+                hub_item_ingest_failed = True
                 logger.warning("Hub sync failed for %s: %s", item.link, ex)
+                return None
 
-        if not settings.direct_publish_enabled:
-            if settings.hub_enabled and hub_sync_ok:
-                for channel_name, _ in channels:
-                    store.mark_seen(channel_name, item.link, published_at)
-                    store.record_attempt(
-                        channel=channel_name,
-                        link=item.link,
-                        title=title,
-                        summary=summary,
-                        text_norm=text_norm,
-                        status="queued_in_hub",
-                    )
-                if channels:
-                    item_has_success = True
-                    published_items += 1
-                    logger.info("Queued to hub only (%s channel(s)): %s", len(channels), item.link)
-            elif settings.hub_enabled and not hub_sync_ok:
-                logger.warning("Hub-only mode: delivery skipped due to hub sync failure: %s", item.link)
-            continue
+        def queue_hub_job(channel_name: str, *, is_duplicate: bool = False, duplicate_reason: str = "") -> bool:
+            if not settings.hub_enabled or not settings.hub_create_jobs:
+                return False
+            item_id = ensure_hub_item()
+            if item_id is None:
+                return False
+            try:
+                payload_snapshot = {
+                    "source_link": item.link,
+                    "short_link": publish_link,
+                    "image_url": item.image_url,
+                    "message": hub_vk_message if channel_name == "vk" else hub_tg_message,
+                    "show_source": settings.vk_show_source if channel_name == "vk" else settings.telegram_show_source,
+                    "is_duplicate": is_duplicate,
+                    "duplicate_reason": duplicate_reason if is_duplicate else "",
+                }
+                hub.create_job(item_id=item_id, channel=channel_name, payload_snapshot=payload_snapshot)
+                return True
+            except Exception as ex:
+                logger.warning("Hub job create failed for %s (%s): %s", item.link, channel_name, ex)
+                return False
+
+        if settings.hub_enabled:
+            ensure_hub_item()
 
         item_has_success = False
         for channel_name, publisher in channels:
             try:
+                if not settings.direct_publish_enabled:
+                    queued = queue_hub_job(channel_name)
+                    if queued:
+                        store.mark_seen(channel_name, item.link, published_at)
+                        store.record_attempt(
+                            channel=channel_name,
+                            link=item.link,
+                            title=title,
+                            summary=summary,
+                            text_norm=text_norm,
+                            status="queued_in_hub",
+                        )
+                        item_has_success = True
+                    else:
+                        logger.warning("Hub-only mode: delivery skipped due to hub sync failure: %s", item.link)
+                    continue
+
                 if settings.event_tag_dedup_enabled:
                     is_event_dup, match_link, event_key = _find_event_duplicate_recent(
                         store,
@@ -537,6 +607,12 @@ def job() -> None:
                             status="rejected_event_duplicate",
                             reason=f"matched:{match_link or ''};event_key:{event_key}",
                         )
+                        if settings.hub_send_duplicates:
+                            queue_hub_job(
+                                channel_name,
+                                is_duplicate=True,
+                                duplicate_reason=f"event_duplicate;matched:{match_link or ''};event_key:{event_key}",
+                            )
                         store.mark_seen(channel_name, item.link, published_at)
                         continue
 
@@ -610,6 +686,12 @@ def job() -> None:
                             reason=f"matched:{match_link or ''};{similarity_reason}",
                             similarity=score,
                         )
+                        if settings.hub_send_duplicates:
+                            queue_hub_job(
+                                channel_name,
+                                is_duplicate=True,
+                                duplicate_reason=f"similar_duplicate;matched:{match_link or ''};{similarity_reason}",
+                            )
                         store.mark_seen(channel_name, item.link, published_at)
                         continue
 

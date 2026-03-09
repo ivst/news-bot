@@ -56,6 +56,7 @@ class Settings:
     hub_api_key: str | None
     hub_timeout_seconds: int
     hub_create_jobs: bool
+    hub_send_duplicates: bool
     direct_publish_enabled: bool
 
 
@@ -126,5 +127,6 @@ def load_settings() -> Settings:
         hub_api_key=(os.getenv("HUB_API_KEY") or "").strip() or None,
         hub_timeout_seconds=max(3, int(os.getenv("HUB_TIMEOUT_SECONDS", "15"))),
         hub_create_jobs=_to_bool(os.getenv("HUB_CREATE_JOBS"), default=True),
+        hub_send_duplicates=_to_bool(os.getenv("HUB_SEND_DUPLICATES"), default=False),
         direct_publish_enabled=_to_bool(os.getenv("DIRECT_PUBLISH_ENABLED"), default=True),
     )
