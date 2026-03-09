@@ -15,6 +15,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from src.config import load_settings
 from src.feeds import fetch_news
+from src.hub_client import HubClient
 from src.link_shortener import shorten_url
 from src.publishers.telegram import TelegramPublisher
 from src.publishers.vk import VKDailyPostLimitError, VKPublisher
@@ -270,6 +271,11 @@ def job() -> None:
         draft_mode=settings.vk_draft_mode,
         draft_delay_minutes=settings.vk_draft_delay_minutes,
     )
+    hub = HubClient(
+        base_url=settings.hub_base_url,
+        api_key=settings.hub_api_key,
+        timeout_seconds=settings.hub_timeout_seconds,
+    )
     if tg.enabled and not tg_active:
         logger.info(
             "Telegram publishing is outside active hours (%s). Current time: %02d:%02d",
@@ -399,6 +405,32 @@ def job() -> None:
         tg_message = strip_ui_noise(build_telegram_message(title, summary, item.link))
         vk_message = strip_ui_noise(build_vk_message(title, summary))
         text_norm = _text_norm_for_similarity(title, summary)
+        if settings.hub_enabled:
+            try:
+                idempotency_key = HubClient.build_idempotency_key(item.link)
+                item_id = hub.ingest_item(
+                    idempotency_key=idempotency_key,
+                    source_link=item.link,
+                    source_title=item.title,
+                    source_text=item.content if item.content else item.title,
+                    translated_title=title,
+                    translated_summary=summary,
+                    translated_body=translated,
+                    language=settings.target_language,
+                    image_url=item.image_url,
+                    suggested_channels=[channel_name for channel_name, _ in channels],
+                )
+                if item_id is not None and settings.hub_create_jobs:
+                    for channel_name, _ in channels:
+                        payload_snapshot = {
+                            "source_link": item.link,
+                            "short_link": publish_link,
+                            "image_url": item.image_url,
+                            "message": vk_message if channel_name == "vk" else tg_message,
+                        }
+                        hub.create_job(item_id=item_id, channel=channel_name, payload_snapshot=payload_snapshot)
+            except Exception as ex:
+                logger.warning("Hub sync failed for %s: %s", item.link, ex)
 
         item_has_success = False
         published_at = item.published_at.astimezone(timezone.utc).isoformat()

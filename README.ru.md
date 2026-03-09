@@ -90,6 +90,7 @@ docker compose logs -f
 - `SIMILAR_DEDUP_THRESHOLD=0.90` - порог похожести (0..1).
 - `SIMILAR_DEDUP_TOKEN_THRESHOLD=0.72` - порог токенного Jaccard-сходства (0..1) для поиска близких дублей.
 - `SIMILAR_DEDUP_MIN_OVERLAP_TOKENS=6` - минимальное число общих токенов для токенного дедупа.
+- `HUB_ENABLED=false`, `HUB_BASE_URL`, `HUB_API_KEY`, `HUB_TIMEOUT_SECONDS=15`, `HUB_CREATE_JOBS=true` - отправлять подготовленные материалы и задания каналов во внешний `news-hub` API.
 
 ### LLM (OpenAI или DeepSeek)
 - `LLM_API_KEY` - ключ провайдера.

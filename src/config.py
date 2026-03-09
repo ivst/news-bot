@@ -49,6 +49,11 @@ class Settings:
     similar_dedup_threshold: float
     similar_dedup_token_threshold: float
     similar_dedup_min_overlap_tokens: int
+    hub_enabled: bool
+    hub_base_url: str | None
+    hub_api_key: str | None
+    hub_timeout_seconds: int
+    hub_create_jobs: bool
 
 
 def _to_bool(value: str | None, default: bool = False) -> bool:
@@ -111,4 +116,9 @@ def load_settings() -> Settings:
             max(0.0, float(os.getenv("SIMILAR_DEDUP_TOKEN_THRESHOLD", "0.72"))),
         ),
         similar_dedup_min_overlap_tokens=max(1, int(os.getenv("SIMILAR_DEDUP_MIN_OVERLAP_TOKENS", "6"))),
+        hub_enabled=_to_bool(os.getenv("HUB_ENABLED"), default=False),
+        hub_base_url=(os.getenv("HUB_BASE_URL") or "").strip().rstrip("/") or None,
+        hub_api_key=(os.getenv("HUB_API_KEY") or "").strip() or None,
+        hub_timeout_seconds=max(3, int(os.getenv("HUB_TIMEOUT_SECONDS", "15"))),
+        hub_create_jobs=_to_bool(os.getenv("HUB_CREATE_JOBS"), default=True),
     )
