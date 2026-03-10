@@ -201,8 +201,16 @@ def _normalize_link(link: str) -> str:
     return urlunsplit((scheme, parts.netloc.lower(), parts.path, normalized_query, ""))
 
 
+def _parse_topic_terms(topic: str) -> List[str]:
+    terms = [part.strip().lower() for part in topic.split(",") if part.strip()]
+    if terms:
+        return terms
+    # Backward-compatible behavior: empty topic matches all items.
+    return [topic.strip().lower()]
+
+
 def fetch_news(rss_urls: List[str], topic: str, limit: int, max_age_days: int = 1) -> List[NewsItem]:
-    topic_lower = topic.lower()
+    topic_terms = _parse_topic_terms(topic)
     collected: List[NewsItem] = []
     cutoff = datetime.now(tz=timezone.utc) - timedelta(days=max(1, max_age_days))
 
@@ -219,7 +227,7 @@ def fetch_news(rss_urls: List[str], topic: str, limit: int, max_age_days: int = 
             link = _normalize_link(entry.get("link") or "")
 
             searchable = f"{title} {summary}".lower()
-            if topic_lower not in searchable:
+            if not any(term in searchable for term in topic_terms):
                 continue
             if not link:
                 continue

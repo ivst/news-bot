@@ -63,7 +63,7 @@ docker compose logs -f
 
 ## Настройка `.env`
 Скопируйте `.env.example` в `.env` и заполните:
-- `TARGET_TOPIC` - тема материалов (например `world news`, `AI`, `fintech`).
+- `TARGET_TOPIC` - тема материалов. Поддерживает одно или несколько ключевых слов через запятую (например `world news` или `world news, AI, fintech`).
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` для Telegram.
 - `TELEGRAM_ACTIVE_HOURS=` - окно публикации Telegram в локальной `TIMEZONE` (`HH-HH`, например `10-18` или `0-24`; по умолчанию пусто = 24/7).
 - `TELEGRAM_SHOW_SOURCE=true` - добавлять строку/ссылку на источник в пост Telegram.

@@ -63,7 +63,7 @@ docker compose logs -f
 
 ## `.env` configuration
 Copy `.env.example` to `.env` and fill in:
-- `TARGET_TOPIC` - topic to collect (for example `world news`, `AI`, `fintech`).
+- `TARGET_TOPIC` - topic to collect. Supports one or multiple keywords separated by commas (for example `world news` or `world news, AI, fintech`).
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` for Telegram.
 - `TELEGRAM_ACTIVE_HOURS=` - active publish window for Telegram in local `TIMEZONE` (`HH-HH`, for example `10-18` or `0-24`; empty by default means 24/7).
 - `TELEGRAM_SHOW_SOURCE=true` - include the source line/link in Telegram posts.
