@@ -597,7 +597,7 @@ def job() -> None:
                             )
                             publisher.publish(
                                 vk_message,
-                                attachment_link=item.link,
+                                attachment_link=vk_source_link,
                                 source_link=vk_source_link,
                                 image_url=item.image_url,
                                 force_draft=True,
@@ -679,7 +679,7 @@ def job() -> None:
                             )
                             publisher.publish(
                                 vk_message,
-                                attachment_link=item.link,
+                                attachment_link=vk_source_link,
                                 source_link=vk_source_link,
                                 image_url=item.image_url,
                                 force_draft=True,
@@ -745,7 +745,7 @@ def job() -> None:
                 if channel_name == "vk":
                     publisher.publish(
                         vk_message,
-                        attachment_link=item.link,
+                        attachment_link=vk_source_link,
                         source_link=vk_source_link,
                         image_url=item.image_url,
                     )
