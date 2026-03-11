@@ -95,7 +95,7 @@ docker compose logs -f
 - `HUB_ENABLED=false`, `HUB_BASE_URL`, `HUB_API_KEY`, `HUB_TIMEOUT_SECONDS=15`, `HUB_CREATE_JOBS=true`, `HUB_SEND_DUPLICATES=false` - отправлять подготовленные материалы и задания каналов во внешний `news-hub` API; задачи-дубли передаются только при включении флага.
 - `DIRECT_PUBLISH_ENABLED=true` - сохранять прямую публикацию в Telegram/VK. Установите `false`, чтобы работать в режиме `hub-only` (доставка только через `news-hub`).
 
-### LLM (OpenAI или DeepSeek)
+### LLM (OpenAI-compatible API)
 - `LLM_ENABLED=false` - общий переключатель LLM-функций. При `false` вызовы LLM не выполняются даже если ключи указаны.
 - `LLM_API_KEY` - ключ провайдера.
 - `LLM_MODEL` - модель (например `gpt-4.1-mini` или `deepseek-chat`).
@@ -105,7 +105,7 @@ docker compose logs -f
 
 Если `LLM_ENABLED=false` или `LLM_API_KEY` пустой, summary делается локальным fallback, а перевод - через `deep-translator`.
 
-Пример для DeepSeek:
+Пример OpenAI-compatible API:
 ```env
 LLM_ENABLED=true
 LLM_API_KEY=your_deepseek_key
