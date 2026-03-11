@@ -84,26 +84,7 @@ docker compose logs -f
 - `LINKS` (shortener)
 
 Расширенные переменные можно не указывать в `.env`: будут использованы дефолты из кода.
-
-### LLM (OpenAI-compatible API)
-- `LLM_ENABLED=false` - общий переключатель LLM-функций. При `false` вызовы LLM не выполняются даже если ключи указаны.
-- `LLM_API_KEY` - ключ провайдера.
-- `LLM_MODEL` - модель (например `gpt-4.1-mini` или `deepseek-chat`).
-- `LLM_BASE_URL` - базовый URL API.
-- `SUMMARY_MAX_LINES=3` - количество строк в итоговом summary.
-- `LLM_SUMMARY_PROMPT` - кастомный шаблон промпта summary (поддерживает плейсхолдеры `{target_language}` и `{summary_max_lines}`).
-
-Если `LLM_ENABLED=false` или `LLM_API_KEY` пустой, summary делается локальным fallback, а перевод - через `deep-translator`.
-
-Пример OpenAI-compatible API:
-```env
-LLM_ENABLED=true
-LLM_API_KEY=your_deepseek_key
-LLM_MODEL=deepseek-chat
-LLM_BASE_URL=https://api.deepseek.com/v1
-SUMMARY_MAX_LINES=3
-LLM_SUMMARY_PROMPT=You are an editor for Telegram and VK digest posts. Write in '{target_language}'. Return exactly {summary_max_lines} lines, each line starts with '• '.
-```
+Полный справочник параметров и настроек по умолчанию: [docs/config.md](docs/config.md).
 
 ## Запуск как systemd-сервис
 
