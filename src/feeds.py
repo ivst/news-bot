@@ -11,6 +11,8 @@ import feedparser
 import requests
 from bs4 import BeautifulSoup
 
+from src.text_cleaner import strip_ui_noise
+
 
 @dataclass
 class NewsItem:
@@ -209,7 +211,13 @@ def _parse_topic_terms(topic: str) -> List[str]:
     return [topic.strip().lower()]
 
 
-def fetch_news(rss_urls: List[str], topic: str, limit: int, max_age_days: int = 1) -> List[NewsItem]:
+def fetch_news(
+    rss_urls: List[str],
+    topic: str,
+    limit: int,
+    max_age_days: int = 1,
+    apply_noise_cleaning: bool = True,
+) -> List[NewsItem]:
     topic_terms = _parse_topic_terms(topic)
     collected: List[NewsItem] = []
     cutoff = datetime.now(tz=timezone.utc) - timedelta(days=max(1, max_age_days))
@@ -224,6 +232,9 @@ def fetch_news(rss_urls: List[str], topic: str, limit: int, max_age_days: int = 
 
             title = (entry.get("title") or "").strip()
             summary = _extract_text(entry.get("summary") or "")
+            if apply_noise_cleaning:
+                title = strip_ui_noise(title)
+                summary = strip_ui_noise(summary)
             link = _normalize_link(entry.get("link") or "")
 
             searchable = f"{title} {summary}".lower()

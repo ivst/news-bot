@@ -364,6 +364,7 @@ def job() -> None:
         settings.target_topic,
         settings.max_news_per_run * 5,
         max_age_days=settings.news_max_age_days,
+        apply_noise_cleaning=not settings.llm_enabled,
     )
     logger.info("Fetched %s candidate news items", len(news))
     llm_api_key = settings.llm_api_key if settings.llm_enabled else None
