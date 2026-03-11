@@ -62,38 +62,25 @@ docker compose logs -f
 ```
 
 ## `.env` configuration
-Copy `.env.example` to `.env` and fill in:
-- `TARGET_TOPIC` - topic to collect. Supports one or multiple keywords separated by commas (for example `world news` or `world news, AI, fintech`).
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` for Telegram.
-- `TELEGRAM_ACTIVE_HOURS=` - active publish window for Telegram in local `TIMEZONE` (`HH-HH`, for example `10-18` or `0-24`; empty by default means 24/7).
-- `TELEGRAM_SHOW_SOURCE=true` - include the source line/link in Telegram posts.
-- `VK_GROUP_ID`, `VK_ACCESS_TOKEN` for VK.
-- `VK_ACTIVE_HOURS=` - active publish window for VK in local `TIMEZONE` (`HH-HH`, for example `10-18` or `0-24`; empty by default means 24/7).
-- `VK_SHOW_SOURCE=true` - include source marker/link fallback in VK post text.
-- `VK_PHOTO_UPLOAD_ENABLED=true` - upload photos to VK via API (requires user token with `photos` scope).
-- `VK_DRAFT_MODE=false` - create postponed VK posts instead of immediate publishing.
-- `VK_DRAFT_DELAY_MINUTES=43200` - postpone delay in minutes (default 30 days).
-- `VK_DAILY_POST_LIMIT=0` - VK posts per local day cap (`0` = unlimited, `100`/`200` = hard app-side cap).
-- `TARGET_LANGUAGE=ru` or another language code.
-- `SCHEDULE_CRON` in cron format (default: every 30 minutes).
-- `NEWS_MAX_AGE_DAYS=1` - only consider news not older than N days.
-- `SHORT_LINKS_ENABLED=false` - shorten links before publishing.
-- `SHORTENER_PROVIDER=isgd` or `tinyurl`.
-- `DEDUP_CLEANUP_ENABLED=true` - auto-clean dedup records on each run.
-- `DEDUP_RETENTION_DAYS=90` - keep dedup records for the last N days.
-- `POST_ATTEMPTS_RETENTION_DAYS=30` - keep publish/reject attempts for the last N days.
-- `REQUIRE_IMAGE_FOR_PUBLISH=false` - publish only items that have an extracted image URL.
-- `DUPLICATE_ACTION=skip` - duplicate handling mode: `skip` or `draft` (for VK duplicates).
-- `EVENT_TAG_DEDUP_ENABLED=false` - reject posts with the same event key built from normalized tags.
-- `EVENT_TAG_DEDUP_WINDOW_DAYS=1` - compare event keys against published posts for the last N days.
-- `EVENT_TAG_DEDUP_MIN_TOKENS=4` - minimum number of meaningful tokens required to form event key.
-- `SIMILAR_DEDUP_ENABLED=true` - reject very similar recent posts.
-- `SIMILAR_DEDUP_WINDOW=15` - compare against the last N published posts per channel.
-- `SIMILAR_DEDUP_THRESHOLD=0.90` - similarity threshold (0..1).
-- `SIMILAR_DEDUP_TOKEN_THRESHOLD=0.72` - token Jaccard threshold (0..1) for near-duplicate detection.
-- `SIMILAR_DEDUP_MIN_OVERLAP_TOKENS=6` - minimal number of overlapping tokens for token-based dedup.
-- `HUB_ENABLED=false`, `HUB_BASE_URL`, `HUB_API_KEY`, `HUB_TIMEOUT_SECONDS=15`, `HUB_CREATE_JOBS=true`, `HUB_SEND_DUPLICATES=false` - forward prepared items and channel jobs to external `news-hub` API; duplicate jobs are sent only when enabled.
-- `DIRECT_PUBLISH_ENABLED=true` - keep direct Telegram/VK publishing enabled. Set `false` to run in `hub-only` mode (delivery only via `news-hub`).
+Copy `.env.example` to `.env`.
+
+Minimal required parameters:
+- `TARGET_TOPIC`, `RSS_URLS`
+- Either Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) or VK (`VK_GROUP_ID`, `VK_ACCESS_TOKEN`)
+
+Commonly adjusted parameters:
+- `TARGET_LANGUAGE`, `TIMEZONE`, `SCHEDULE_CRON`, `MAX_NEWS_PER_RUN`, `NEWS_MAX_AGE_DAYS`
+- `TELEGRAM_ACTIVE_HOURS` / `VK_ACTIVE_HOURS`
+- `DIRECT_PUBLISH_ENABLED`
+
+Advanced parameters are grouped in `.env.example` by blocks:
+- `LLM` (quality/translation/summarization)
+- `VK advanced` (drafts, daily limit, photo upload)
+- `DEDUP / SAFETY` (event/similarity dedup and retention)
+- `HUB integration` (external delivery API)
+- `LINKS` (shorteners)
+
+You can safely omit advanced variables from `.env`; defaults from code will be used.
 
 ### LLM (OpenAI-compatible API)
 - `LLM_ENABLED=false` - global switch for all LLM features. When `false`, no LLM calls are made even if API keys are set.

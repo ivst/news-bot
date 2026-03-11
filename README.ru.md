@@ -62,38 +62,25 @@ docker compose logs -f
 ```
 
 ## Настройка `.env`
-Скопируйте `.env.example` в `.env` и заполните:
-- `TARGET_TOPIC` - тема материалов. Поддерживает одно или несколько ключевых слов через запятую (например `world news` или `world news, AI, fintech`).
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` для Telegram.
-- `TELEGRAM_ACTIVE_HOURS=` - окно публикации Telegram в локальной `TIMEZONE` (`HH-HH`, например `10-18` или `0-24`; по умолчанию пусто = 24/7).
-- `TELEGRAM_SHOW_SOURCE=true` - добавлять строку/ссылку на источник в пост Telegram.
-- `VK_GROUP_ID`, `VK_ACCESS_TOKEN` для VK.
-- `VK_ACTIVE_HOURS=` - окно публикации VK в локальной `TIMEZONE` (`HH-HH`, например `10-18` или `0-24`; по умолчанию пусто = 24/7).
-- `VK_SHOW_SOURCE=true` - добавлять маркер/ссылку источника в текст поста VK.
-- `VK_PHOTO_UPLOAD_ENABLED=true` - загружать фото в VK через API (нужен user token с правом `photos`).
-- `VK_DRAFT_MODE=false` - создавать отложенные посты VK вместо немедленной публикации.
-- `VK_DRAFT_DELAY_MINUTES=43200` - задержка отложенной публикации в минутах (по умолчанию 30 дней).
-- `VK_DAILY_POST_LIMIT=0` - лимит постов VK в сутки по локальной `TIMEZONE` (`0` = без лимита, `100`/`200` = жесткий лимит на стороне приложения).
-- `TARGET_LANGUAGE=ru` или другой код языка.
-- `SCHEDULE_CRON` в формате cron (по умолчанию каждые 30 минут).
-- `NEWS_MAX_AGE_DAYS=1` - учитывать только новости не старше N дней.
-- `SHORT_LINKS_ENABLED=false` - сокращать ссылку перед публикацией.
-- `SHORTENER_PROVIDER=isgd` или `tinyurl`.
-- `DEDUP_CLEANUP_ENABLED=true` - автоочистка дедуп-записей на каждом запуске.
-- `DEDUP_RETENTION_DAYS=90` - хранить дедуп-записи за последние N дней.
-- `POST_ATTEMPTS_RETENTION_DAYS=30` - хранить историю попыток публикации/отказов за последние N дней.
-- `REQUIRE_IMAGE_FOR_PUBLISH=false` - публиковать только новости, у которых удалось извлечь URL изображения.
-- `DUPLICATE_ACTION=skip` - режим обработки дублей: `skip` или `draft` (для дублей в VK).
-- `EVENT_TAG_DEDUP_ENABLED=false` - отклонять посты с одинаковым event key, собранным из нормализованных тегов.
-- `EVENT_TAG_DEDUP_WINDOW_DAYS=1` - сравнивать event key с опубликованными постами за последние N дней.
-- `EVENT_TAG_DEDUP_MIN_TOKENS=4` - минимальное число значимых токенов для формирования event key.
-- `SIMILAR_DEDUP_ENABLED=true` - отклонять слишком похожие недавние посты.
-- `SIMILAR_DEDUP_WINDOW=15` - сравнивать с последними N опубликованными постами по каналу.
-- `SIMILAR_DEDUP_THRESHOLD=0.90` - порог похожести (0..1).
-- `SIMILAR_DEDUP_TOKEN_THRESHOLD=0.72` - порог токенного Jaccard-сходства (0..1) для поиска близких дублей.
-- `SIMILAR_DEDUP_MIN_OVERLAP_TOKENS=6` - минимальное число общих токенов для токенного дедупа.
-- `HUB_ENABLED=false`, `HUB_BASE_URL`, `HUB_API_KEY`, `HUB_TIMEOUT_SECONDS=15`, `HUB_CREATE_JOBS=true`, `HUB_SEND_DUPLICATES=false` - отправлять подготовленные материалы и задания каналов во внешний `news-hub` API; задачи-дубли передаются только при включении флага.
-- `DIRECT_PUBLISH_ENABLED=true` - сохранять прямую публикацию в Telegram/VK. Установите `false`, чтобы работать в режиме `hub-only` (доставка только через `news-hub`).
+Скопируйте `.env.example` в `.env`.
+
+Минимально необходимые параметры:
+- `TARGET_TOPIC`, `RSS_URLS`
+- Либо Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`), либо VK (`VK_GROUP_ID`, `VK_ACCESS_TOKEN`)
+
+Параметры, которые обычно меняют:
+- `TARGET_LANGUAGE`, `TIMEZONE`, `SCHEDULE_CRON`, `MAX_NEWS_PER_RUN`, `NEWS_MAX_AGE_DAYS`
+- `TELEGRAM_ACTIVE_HOURS` / `VK_ACTIVE_HOURS`
+- `DIRECT_PUBLISH_ENABLED`
+
+Расширенные параметры сгруппированы в `.env.example` по блокам:
+- `LLM` (качество перевода/summary)
+- `VK advanced` (драфты, дневной лимит, фото)
+- `DEDUP / SAFETY` (дедуп и ретеншн)
+- `HUB integration` (внешний delivery API)
+- `LINKS` (shortener)
+
+Расширенные переменные можно не указывать в `.env`: будут использованы дефолты из кода.
 
 ### LLM (OpenAI-compatible API)
 - `LLM_ENABLED=false` - общий переключатель LLM-функций. При `false` вызовы LLM не выполняются даже если ключи указаны.
