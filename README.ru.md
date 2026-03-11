@@ -68,6 +68,9 @@ docker compose logs -f
 - `TARGET_TOPIC`, `RSS_URLS`
 - Либо Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`), либо VK (`VK_GROUP_ID`, `VK_ACCESS_TOKEN`)
 
+`TARGET_TOPIC` поддерживает одно или несколько ключевых слов через запятую.
+Пустое значение (`TARGET_TOPIC=`) отключает фильтрацию по теме и пропускает все материалы из `RSS_URLS`.
+
 Параметры, которые обычно меняют:
 - `TARGET_LANGUAGE`, `TIMEZONE`, `SCHEDULE_CRON`, `MAX_NEWS_PER_RUN`, `NEWS_MAX_AGE_DAYS`
 - `TELEGRAM_ACTIVE_HOURS` / `VK_ACTIVE_HOURS`

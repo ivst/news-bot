@@ -68,6 +68,9 @@ Minimal required parameters:
 - `TARGET_TOPIC`, `RSS_URLS`
 - Either Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) or VK (`VK_GROUP_ID`, `VK_ACCESS_TOKEN`)
 
+`TARGET_TOPIC` supports one or multiple comma-separated keywords.
+Use an empty value (`TARGET_TOPIC=`) to disable topic filtering and process all items from `RSS_URLS`.
+
 Commonly adjusted parameters:
 - `TARGET_LANGUAGE`, `TIMEZONE`, `SCHEDULE_CRON`, `MAX_NEWS_PER_RUN`, `NEWS_MAX_AGE_DAYS`
 - `TELEGRAM_ACTIVE_HOURS` / `VK_ACTIVE_HOURS`
