@@ -366,6 +366,7 @@ def job() -> None:
         max_age_days=settings.news_max_age_days,
     )
     logger.info("Fetched %s candidate news items", len(news))
+    llm_api_key = settings.llm_api_key if settings.llm_enabled else None
 
     published_items = 0
     published_posts = 0
@@ -419,10 +420,10 @@ def job() -> None:
         translated = translate_text(
             source_text,
             settings.target_language,
-            llm_api_key=settings.llm_api_key,
+            llm_api_key=llm_api_key,
             llm_model=settings.llm_model,
             llm_base_url=settings.llm_base_url,
-            use_llm_translation=settings.llm_translation_enabled,
+            use_llm_translation=settings.llm_enabled,
         )
         if not translated:
             logger.warning("Skipped (translation failed for body): %s", item.link)
@@ -445,7 +446,7 @@ def job() -> None:
         summary = summarize_text(
             translated,
             target_language=settings.target_language,
-            llm_api_key=settings.llm_api_key,
+            llm_api_key=llm_api_key,
             llm_model=settings.llm_model,
             llm_base_url=settings.llm_base_url,
             prompt_template=settings.llm_summary_prompt,
@@ -455,10 +456,10 @@ def job() -> None:
         title = translate_text(
             item.title,
             settings.target_language,
-            llm_api_key=settings.llm_api_key,
+            llm_api_key=llm_api_key,
             llm_model=settings.llm_model,
             llm_base_url=settings.llm_base_url,
-            use_llm_translation=settings.llm_translation_enabled,
+            use_llm_translation=settings.llm_enabled,
         )
         if not title:
             logger.warning("Skipped (translation failed for title): %s", item.link)

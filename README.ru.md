@@ -96,21 +96,21 @@ docker compose logs -f
 - `DIRECT_PUBLISH_ENABLED=true` - сохранять прямую публикацию в Telegram/VK. Установите `false`, чтобы работать в режиме `hub-only` (доставка только через `news-hub`).
 
 ### LLM (OpenAI или DeepSeek)
+- `LLM_ENABLED=false` - общий переключатель LLM-функций. При `false` вызовы LLM не выполняются даже если ключи указаны.
 - `LLM_API_KEY` - ключ провайдера.
 - `LLM_MODEL` - модель (например `gpt-4.1-mini` или `deepseek-chat`).
 - `LLM_BASE_URL` - базовый URL API.
-- `LLM_TRANSLATION_ENABLED=true` - включить перевод через LLM.
 - `SUMMARY_MAX_LINES=3` - количество строк в итоговом summary.
 - `LLM_SUMMARY_PROMPT` - кастомный шаблон промпта summary (поддерживает плейсхолдеры `{target_language}` и `{summary_max_lines}`).
 
-Если `LLM_API_KEY` пустой, summary делается локальным fallback, а перевод - через `deep-translator`.
+Если `LLM_ENABLED=false` или `LLM_API_KEY` пустой, summary делается локальным fallback, а перевод - через `deep-translator`.
 
 Пример для DeepSeek:
 ```env
+LLM_ENABLED=true
 LLM_API_KEY=your_deepseek_key
 LLM_MODEL=deepseek-chat
 LLM_BASE_URL=https://api.deepseek.com/v1
-LLM_TRANSLATION_ENABLED=true
 SUMMARY_MAX_LINES=3
 LLM_SUMMARY_PROMPT=You are an editor for Telegram and VK digest posts. Write in '{target_language}'. Return exactly {summary_max_lines} lines, each line starts with '• '.
 ```

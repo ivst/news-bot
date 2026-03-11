@@ -30,10 +30,10 @@ class Settings:
     vk_draft_mode: bool
     vk_draft_delay_minutes: int
     vk_daily_post_limit: int
+    llm_enabled: bool
     llm_api_key: str | None
     llm_model: str
     llm_base_url: str
-    llm_translation_enabled: bool
     llm_summary_prompt: str
     summary_max_lines: int
     short_links_enabled: bool
@@ -93,10 +93,10 @@ def load_settings() -> Settings:
         vk_draft_mode=_to_bool(os.getenv("VK_DRAFT_MODE"), default=False),
         vk_draft_delay_minutes=max(10, int(os.getenv("VK_DRAFT_DELAY_MINUTES", "43200"))),
         vk_daily_post_limit=max(0, int(os.getenv("VK_DAILY_POST_LIMIT", "0"))),
+        llm_enabled=_to_bool(os.getenv("LLM_ENABLED"), default=False),
         llm_api_key=(os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or None),
         llm_model=os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gpt-4.1-mini")),
         llm_base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
-        llm_translation_enabled=_to_bool(os.getenv("LLM_TRANSLATION_ENABLED"), default=False),
         llm_summary_prompt=os.getenv(
             "LLM_SUMMARY_PROMPT",
             "You are an editor for Telegram and VK digest posts. Write in '{target_language}'. "
