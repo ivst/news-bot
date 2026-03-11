@@ -92,7 +92,9 @@ def strip_ui_noise(text: str) -> str:
         if _looks_like_feed_meta_line(line):
             continue
         normalized = re.sub(r"[ \t]{2,}", " ", line)
-        normalized = re.sub(r"^(?:[•\-]\s*)?[\]\[]\s*", "", normalized)
+        # Drop only orphan bracket tokens like "] text" or "[ text",
+        # but keep structured tags such as "[Видео] ...".
+        normalized = re.sub(r"^(?:[•\-]\s*)?[\]\[]\s+(?=\S)", "", normalized)
         normalized = re.sub(r"[ \t]+([,.;:!?])", r"\1", normalized)
         normalized = normalized.strip()
         if not normalized:
