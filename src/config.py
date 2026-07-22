@@ -106,7 +106,7 @@ def load_settings() -> Settings:
             "Keep it factual and concise, no hype, no markdown, no date/source/link repetition.",
         ),
         llm_translation_max_tokens=max(1, int(os.getenv("LLM_TRANSLATION_MAX_TOKENS", "1200"))),
-        llm_summary_max_tokens=max(1, int(os.getenv("LLM_SUMMARY_MAX_TOKENS", "600"))),
+        llm_summary_max_tokens=max(1, int(os.getenv("LLM_SUMMARY_MAX_TOKENS", "1000"))),
         summary_max_lines=max(1, int(os.getenv("SUMMARY_MAX_LINES", "3"))),
         short_links_enabled=_to_bool(os.getenv("SHORT_LINKS_ENABLED"), default=False),
         shortener_provider=os.getenv("SHORTENER_PROVIDER", "isgd").strip().lower(),
