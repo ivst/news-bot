@@ -1,182 +1,127 @@
 # NEWS BOT
 
+A news automation service: collects fresh news for `TARGET_TOPIC`, translates it, generates a short summary, and publishes to Telegram and/or VK on schedule.
+
 Russian version: [README.ru.md](README.ru.md)
 
-A news automation service: collects fresh news for `TARGET_TOPIC`, translates it, generates a short summary, and publishes it to Telegram and VK on schedule. Works locally, on a server/VPS, or in Docker.
+## Quick start
 
-## What it does
-- Reads RSS sources (`RSS_URLS`).
-- Filters news by `TARGET_TOPIC`.
-- Translates title and text into `TARGET_LANGUAGE`.
-- Generates a short summary.
-- Publishes a post with a source link to Telegram and/or VK.
-- Prevents duplicate publishing of the same link (SQLite).
-
-## Full installation (from Git)
-
-### Requirements
-- Linux server with `systemd`
-- `git`, `python3`, `python3-venv`, `pip`
-
-Ubuntu/Debian:
-```bash
-sudo apt update
-sudo apt install -y git python3 python3-venv python3-pip
-```
-
-### Install to `/opt/news-bot`
-```bash
-sudo useradd -r -s /usr/sbin/nologin news-bot || true
-sudo git clone https://github.com/ivst/news-bot.git /opt/news-bot
-sudo chown -R news-bot:news-bot /opt/news-bot
-cd /opt/news-bot
-sudo -u news-bot python3 -m venv .venv
-sudo -u news-bot /opt/news-bot/.venv/bin/pip install -r /opt/news-bot/requirements.txt
-sudo -u news-bot cp .env.example .env
-# edit /opt/news-bot/.env with your values
-```
-
-## Quick start (Python)
+### 1. Clone the repo
 
 ```bash
-cd /opt/news-bot
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# fill .env with your tokens
-python main.py
+git clone https://github.com/ivst/news-bot.git
+cd news-bot
 ```
 
-## Run with Docker
+### 2. Pick a method
 
+**Docker** — just clone and run:
 ```bash
 cp .env.example .env
-# fill .env
+# edit .env with your tokens, then:
 docker compose up -d --build
-```
-
-Logs:
-```bash
 docker compose logs -f
 ```
 
-## `.env` configuration
-Copy `.env.example` to `.env`.
-
-Minimal required parameters:
-- `TARGET_TOPIC`, `RSS_URLS`
-- Either Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) or VK (`VK_GROUP_ID`, `VK_ACCESS_TOKEN`)
-
-`TARGET_TOPIC` supports one or multiple comma-separated keywords.
-Use an empty value (`TARGET_TOPIC=`) to disable topic filtering and process all items from `RSS_URLS`.
-
-Commonly adjusted parameters:
-- `TARGET_LANGUAGE`, `TIMEZONE`, `SCHEDULE_CRON`, `MAX_NEWS_PER_RUN`, `NEWS_MAX_AGE_DAYS`
-- `TELEGRAM_ACTIVE_HOURS` / `VK_ACTIVE_HOURS`
-- `DIRECT_PUBLISH_ENABLED`
-
-Advanced parameters are grouped in `.env.example` by blocks:
-- `LLM` (quality/translation/summarization)
-- `VK advanced` (drafts, daily limit, photo upload)
-- `DEDUP / SAFETY` (event/similarity dedup and retention)
-- `HUB integration` (external delivery API)
-- `LINKS` (shorteners)
-
-You can safely omit advanced variables from `.env`; defaults from code will be used.
-Full parameter reference with defaults: [docs/config.md](docs/config.md).
-
-## Run as a systemd service
-
-1. Install the unit:
+**Python** — install dependencies first:
 ```bash
-sudo cp deploy/news-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable news-bot
-sudo systemctl start news-bot
+sudo apt install -y git python3 python3-venv python3-pip  # Debian/Ubuntu
 ```
-2. Logs:
+then:
 ```bash
+cp .env.example .env
+# edit .env with your tokens, then:
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+**systemd** — install dependencies first:
+```bash
+sudo apt install -y git python3 python3-venv python3-pip  # Debian/Ubuntu
+```
+then:
+```bash
+sudo git clone https://github.com/ivst/news-bot.git /opt/news-bot
+cd /opt/news-bot
+sudo chmod +x scripts/install.sh
+sudo ./scripts/install.sh  # creates .env from template — answer 'n' on start prompt
+```
+Now edit `/opt/news-bot/.env` with your tokens, then:
+```bash
+sudo systemctl enable --now news-bot
 sudo journalctl -u news-bot -f
 ```
 
-### Run multiple instances (systemd template)
-Use template unit `news-bot@.service` if you need multiple channels/topics in parallel.
+### Common `.env` tweaks
 
-1. Install template unit:
+| Variable | What it does |
+|----------|-------------|
+| `TARGET_LANGUAGE` | Output language (default: `ru`) |
+| `TIMEZONE` | Your timezone (default: `Europe/Moscow`) |
+| `SCHEDULE_CRON` | When to post (default: `*/30 * * * *`) |
+| `MAX_NEWS_PER_RUN` | Max posts per cycle (default: `3`) |
+| `DIRECT_PUBLISH_ENABLED` | Post immediately or draft first (default: `true`) |
+
+Advanced settings (LLM, VK drafts, dedup, etc.) → [docs/config.md](docs/config.md).
+
+---
+
+## Production (systemd)
+
+### Full installation
+
 ```bash
-sudo cp deploy/news-bot@.service /etc/systemd/system/
-sudo systemctl daemon-reload
+sudo git clone https://github.com/ivst/news-bot.git /opt/news-bot
+cd /opt/news-bot
+sudo chmod +x scripts/install.sh
+sudo ./scripts/install.sh
 ```
-2. Create env files per instance:
+
+The script creates the `news-bot` user, venv, installs dependencies, copies `.env.example` → `.env`, and installs the systemd unit.
+
+### Update
+
 ```bash
-cp /opt/news-bot/.env /opt/news-bot/.env.main
-cp /opt/news-bot/.env /opt/news-bot/.env.pub2
+sudo ./scripts/update_service.sh
 ```
-3. In each file set separate values at least for:
-- `TELEGRAM_CHAT_ID` and/or `VK_GROUP_ID`
-- `TARGET_TOPIC`
-- `DATABASE_PATH` (for example `./data/news_main.db`, `./data/news_pub2.db`)
-4. Start instances:
+
+Auto-detects all running `news-bot@*.service` instances, runs `git pull` + `pip install`, and restarts them.
+
+### Multiple instances
+
 ```bash
+sudo SERVICE='news-bot@main' ./scripts/install.sh  # installs template
+sudo cp /opt/news-bot/.env /opt/news-bot/.env.main  # separate config
 sudo systemctl enable --now news-bot@main
-sudo systemctl enable --now news-bot@pub2
-```
-5. Logs for specific instance:
-```bash
-sudo journalctl -u news-bot@pub2 -f
+sudo journalctl -u news-bot@main -f
 ```
 
-### Update running systemd service
-You can update code, dependencies, and restart the service with one script:
+Each instance needs its own `.env.{name}` with distinct `TELEGRAM_CHAT_ID`, `TARGET_TOPIC`, and `DATABASE_PATH`.
 
-```bash
-chmod +x scripts/update_service.sh
-./scripts/update_service.sh
-```
+---
 
-If the repository is owned by `news-bot` (recommended for `/opt/news-bot`), run updates as that user:
+## Docker
 
 ```bash
-sudo -u news-bot -H bash -lc 'cd /opt/news-bot && git pull --rebase origin master'
+cp .env.example .env
+# edit .env with your tokens, then:
+docker compose up -d --build
+docker compose logs -f
 ```
 
-If Git shows `fatal: detected dubious ownership in repository at '/opt/news-bot'`, either use the correct owner account (recommended) or mark the directory as safe for that user:
+Data is persisted in `./data/`.
 
-```bash
-sudo -u news-bot -H git config --global --add safe.directory /opt/news-bot
-```
-
-Script behavior:
-- if `SERVICE` is set, restarts only that unit;
-- if `SERVICE` is empty, auto-detects and restarts all `news-bot@*.service` units;
-- if no template units are found, restarts `news-bot`.
-
-Optional environment overrides:
-```bash
-APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts/update_service.sh
-```
-
-Examples for template instances:
-```bash
-SERVICE='news-bot@main' ./scripts/update_service.sh
-SERVICE='news-bot@pub2' ./scripts/update_service.sh
-```
+---
 
 ## Notes
-- If you publish only to one platform, fill only the corresponding variables.
-- Published links database: `data/news.db`.
-- If `RSS_URLS` is empty, the service will not publish anything.
 
-### Check publish/reject history
-```bash
-sqlite3 /opt/news-bot/data/news.db "SELECT channel,status,similarity,substr(title,1,90),created_at FROM post_attempts ORDER BY id DESC LIMIT 30;"
-```
-
-Only rejected similar:
-```bash
-sqlite3 /opt/news-bot/data/news.db "SELECT channel,similarity,link,created_at FROM post_attempts WHERE status='rejected_similar' ORDER BY id DESC LIMIT 30;"
-```
+- **Database**: published links are stored in `data/news.db` (SQLite).
+- **Publish history**: `sqlite3 data/news.db "SELECT channel,status,similarity,substr(title,1,90),created_at FROM post_attempts ORDER BY id DESC LIMIT 30;"`
+- **Rejected (similar)**: `sqlite3 data/news.db "SELECT channel,similarity,link,created_at FROM post_attempts WHERE status='rejected_similar' ORDER BY id DESC LIMIT 30;"`
+- **Empty RSS_URLS**: the service runs but publishes nothing.
 
 ## License
-This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+MIT. See [LICENSE](LICENSE).

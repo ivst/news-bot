@@ -1,182 +1,127 @@
 # NEWS BOT
 
+Сервис автоматизации новостей: собирает свежие новости по теме, переводит, делает короткое саммари и публикует в Telegram и/или VK по расписанию.
+
 English version: [README.md](README.md)
 
-Сервис автоматизации новостей: собирает свежие новости по теме из `TARGET_TOPIC`, переводит, делает короткое саммари и публикует в Telegram и VK по расписанию. Работает локально, на сервере/VPS или в Docker.
+## Быстрый старт
 
-## Что делает
-- Читает RSS-источники (`RSS_URLS`).
-- Фильтрует новости по `TARGET_TOPIC`.
-- Переводит заголовок и текст на `TARGET_LANGUAGE`.
-- Делает короткое summary.
-- Публикует пост со ссылкой на источник в Telegram и/или VK.
-- Не публикует повторно одну и ту же ссылку (SQLite).
-
-## Полная установка (с Git)
-
-### Требования
-- Linux-сервер с `systemd`
-- `git`, `python3`, `python3-venv`, `pip`
-
-Ubuntu/Debian:
-```bash
-sudo apt update
-sudo apt install -y git python3 python3-venv python3-pip
-```
-
-### Установка в `/opt/news-bot`
-```bash
-sudo useradd -r -s /usr/sbin/nologin news-bot || true
-sudo git clone https://github.com/ivst/news-bot.git /opt/news-bot
-sudo chown -R news-bot:news-bot /opt/news-bot
-cd /opt/news-bot
-sudo -u news-bot python3 -m venv .venv
-sudo -u news-bot /opt/news-bot/.venv/bin/pip install -r /opt/news-bot/requirements.txt
-sudo -u news-bot cp .env.example .env
-# отредактируйте /opt/news-bot/.env
-```
-
-## Быстрый запуск (Python)
+### 1. Клонируйте репозиторий
 
 ```bash
-cd /opt/news-bot
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# заполните .env токенами
-python main.py
+git clone https://github.com/ivst/news-bot.git
+cd news-bot
 ```
 
-## Запуск в Docker
+### 2. Выберите способ
 
+**Docker** — просто клонируйте и запускайте:
 ```bash
 cp .env.example .env
-# заполните .env
+# заполните .env токенами, затем:
 docker compose up -d --build
-```
-
-Логи:
-```bash
 docker compose logs -f
 ```
 
-## Настройка `.env`
-Скопируйте `.env.example` в `.env`.
-
-Минимально необходимые параметры:
-- `TARGET_TOPIC`, `RSS_URLS`
-- Либо Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`), либо VK (`VK_GROUP_ID`, `VK_ACCESS_TOKEN`)
-
-`TARGET_TOPIC` поддерживает одно или несколько ключевых слов через запятую.
-Пустое значение (`TARGET_TOPIC=`) отключает фильтрацию по теме и пропускает все материалы из `RSS_URLS`.
-
-Параметры, которые обычно меняют:
-- `TARGET_LANGUAGE`, `TIMEZONE`, `SCHEDULE_CRON`, `MAX_NEWS_PER_RUN`, `NEWS_MAX_AGE_DAYS`
-- `TELEGRAM_ACTIVE_HOURS` / `VK_ACTIVE_HOURS`
-- `DIRECT_PUBLISH_ENABLED`
-
-Расширенные параметры сгруппированы в `.env.example` по блокам:
-- `LLM` (качество перевода/summary)
-- `VK advanced` (драфты, дневной лимит, фото)
-- `DEDUP / SAFETY` (дедуп и ретеншн)
-- `HUB integration` (внешний delivery API)
-- `LINKS` (shortener)
-
-Расширенные переменные можно не указывать в `.env`: будут использованы дефолты из кода.
-Полный справочник параметров и настроек по умолчанию: [docs/config.md](docs/config.md).
-
-## Запуск как systemd-сервис
-
-1. Установите unit:
+**Python** — установите зависимости:
 ```bash
-sudo cp deploy/news-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable news-bot
-sudo systemctl start news-bot
+sudo apt install -y git python3 python3-venv python3-pip  # Debian/Ubuntu
 ```
-2. Логи:
+затем:
 ```bash
+cp .env.example .env
+# заполните .env токенами, затем:
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+**systemd** — установите зависимости:
+```bash
+sudo apt install -y git python3 python3-venv python3-pip  # Debian/Ubuntu
+```
+затем:
+```bash
+sudo git clone https://github.com/ivst/news-bot.git /opt/news-bot
+cd /opt/news-bot
+sudo chmod +x scripts/install.sh
+sudo ./scripts/install.sh  # создаёт .env из шаблона — ответьте 'n' на предложение запуска
+```
+Теперь отредактируйте `/opt/news-bot/.env` со своими токенами, затем:
+```bash
+sudo systemctl enable --now news-bot
 sudo journalctl -u news-bot -f
 ```
 
-### Запуск нескольких инстансов (systemd template)
-Если нужно вести несколько каналов/тем параллельно, используйте шаблонный unit `news-bot@.service`.
+### Частые настройки `.env`
 
-1. Установите шаблонный unit:
+| Переменная | Что делает |
+|-----------|-----------|
+| `TARGET_LANGUAGE` | Язык вывода (по умолч.: `ru`) |
+| `TIMEZONE` | Часовой пояс (по умолч.: `Europe/Moscow`) |
+| `SCHEDULE_CRON` | Расписание публикаций (по умолч.: `*/30 * * * *`) |
+| `MAX_NEWS_PER_RUN` | Постов за цикл (по умолч.: `3`) |
+| `DIRECT_PUBLISH_ENABLED` | Публиковать сразу или в черновик (по умолч.: `true`) |
+
+Расширенные параметры (LLM, черновики VK, дедупликация и т.д.) → [docs/config.md](docs/config.md).
+
+---
+
+## Production (systemd)
+
+### Полная установка
+
 ```bash
-sudo cp deploy/news-bot@.service /etc/systemd/system/
-sudo systemctl daemon-reload
+sudo git clone https://github.com/ivst/news-bot.git /opt/news-bot
+cd /opt/news-bot
+sudo chmod +x scripts/install.sh
+sudo ./scripts/install.sh
 ```
-2. Создайте env-файлы для каждого инстанса:
+
+Скрипт создаёт пользователя `news-bot`, venv, устанавливает зависимости, копирует `.env.example` → `.env` и ставит systemd-юнит.
+
+### Обновление
+
 ```bash
-cp /opt/news-bot/.env /opt/news-bot/.env.main
-cp /opt/news-bot/.env /opt/news-bot/.env.pub2
+sudo ./scripts/update_service.sh
 ```
-3. В каждом файле задайте разные значения минимум для:
-- `TELEGRAM_CHAT_ID` и/или `VK_GROUP_ID`
-- `TARGET_TOPIC`
-- `DATABASE_PATH` (например `./data/news_main.db`, `./data/news_pub2.db`)
-4. Запустите инстансы:
+
+Автоматически находит все запущенные `news-bot@*.service`, делает `git pull` + `pip install` и перезапускает их.
+
+### Несколько инстансов
+
 ```bash
+sudo SERVICE='news-bot@main' ./scripts/install.sh  # установка шаблона
+sudo cp /opt/news-bot/.env /opt/news-bot/.env.main  # отдельный конфиг
 sudo systemctl enable --now news-bot@main
-sudo systemctl enable --now news-bot@pub2
-```
-5. Логи конкретного инстанса:
-```bash
-sudo journalctl -u news-bot@pub2 -f
+sudo journalctl -u news-bot@main -f
 ```
 
-### Обновление запущенного systemd-сервиса
-Можно обновить код, зависимости и перезапустить сервис одним скриптом:
+Для каждого инстанса нужен свой `.env.{name}` с уникальными `TELEGRAM_CHAT_ID`, `TARGET_TOPIC` и `DATABASE_PATH`.
 
-```bash
-chmod +x scripts/update_service.sh
-./scripts/update_service.sh
-```
+---
 
-Если репозиторий принадлежит пользователю `news-bot` (рекомендуется для `/opt/news-bot`), выполняйте обновление от его имени:
+## Docker
 
 ```bash
-sudo -u news-bot -H bash -lc 'cd /opt/news-bot && git pull --rebase origin master'
+cp .env.example .env
+# заполните .env токенами, затем:
+docker compose up -d --build
+docker compose logs -f
 ```
 
-Если Git показывает `fatal: detected dubious ownership in repository at '/opt/news-bot'`, используйте аккаунт владельца (рекомендуется) или добавьте каталог в safe-directory для этого пользователя:
+Данные сохраняются в `./data/`.
 
-```bash
-sudo -u news-bot -H git config --global --add safe.directory /opt/news-bot
-```
+---
 
-Поведение скрипта:
-- если задан `SERVICE`, перезапускается только этот unit;
-- если `SERVICE` пустой, скрипт автоматически находит и перезапускает все `news-bot@*.service`;
-- если шаблонные unit'ы не найдены, перезапускается `news-bot`.
+## Прочее
 
-Опциональные переопределения через переменные окружения:
-```bash
-APP_DIR=/opt/news-bot APP_USER=news-bot SERVICE=news-bot BRANCH=master ./scripts/update_service.sh
-```
-
-Примеры для шаблонных инстансов:
-```bash
-SERVICE='news-bot@main' ./scripts/update_service.sh
-SERVICE='news-bot@pub2' ./scripts/update_service.sh
-```
-
-## Примечания
-- Для публикации только в одну платформу можно заполнить только соответствующие переменные.
-- База опубликованных ссылок: `data/news.db`.
-- При пустом `RSS_URLS` сервис ничего не публикует.
-
-### Как проверить историю публикаций/отказов
-```bash
-sqlite3 /opt/news-bot/data/news.db "SELECT channel,status,similarity,substr(title,1,90),created_at FROM post_attempts ORDER BY id DESC LIMIT 30;"
-```
-
-Только отказы из-за похожести:
-```bash
-sqlite3 /opt/news-bot/data/news.db "SELECT channel,similarity,link,created_at FROM post_attempts WHERE status='rejected_similar' ORDER BY id DESC LIMIT 30;"
-```
+- **База данных**: опубликованные ссылки хранятся в `data/news.db` (SQLite).
+- **История публикаций**: `sqlite3 data/news.db "SELECT channel,status,similarity,substr(title,1,90),created_at FROM post_attempts ORDER BY id DESC LIMIT 30;"`
+- **Отказы по похожести**: `sqlite3 data/news.db "SELECT channel,similarity,link,created_at FROM post_attempts WHERE status='rejected_similar' ORDER BY id DESC LIMIT 30;"`
+- **Пустой RSS_URLS**: сервис работает, но ничего не публикует.
 
 ## Лицензия
-Проект распространяется по лицензии MIT. См. [LICENSE](LICENSE).
+
+MIT. См. [LICENSE](LICENSE).
