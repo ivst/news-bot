@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from src.llm import chat_completion
+
+logger = logging.getLogger(__name__)
 
 
 def _simple_summary(text: str, max_chars: int = 420, max_lines: int = 2) -> str:
@@ -48,7 +51,8 @@ def summarize_text(
                 target_language=target_language,
                 summary_max_lines=summary_max_lines,
             )
-        except Exception:
+        except Exception as ex:
+            logger.warning("LLM summary prompt formatting failed; default prompt will be used: %s", ex)
             prompt = default_prompt.format(
                 target_language=target_language,
                 summary_max_lines=summary_max_lines,
@@ -63,8 +67,15 @@ def summarize_text(
             temperature=0.1,
         )
         if out:
+            logger.info(
+                "LLM summary succeeded target_language=%s output_chars=%s lines=%s",
+                target_language,
+                len(out),
+                len([line for line in out.splitlines() if line.strip()]),
+            )
             return out
-    except Exception:
-        pass
+        logger.warning("LLM summary returned empty response; simple summary will be used.")
+    except Exception as ex:
+        logger.warning("LLM summary generation failed; simple summary will be used: %s", ex)
 
     return _simple_summary(text, max_lines=summary_max_lines)

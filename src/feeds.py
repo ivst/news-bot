@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -12,6 +13,9 @@ import requests
 from bs4 import BeautifulSoup
 
 from src.text_cleaner import strip_ui_noise
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -97,7 +101,8 @@ def _extract_image_from_article(link: str) -> Optional[str]:
                 url = _normalize_image_url(str(node.get("content")))
                 if url:
                     return url
-    except requests.RequestException:
+    except requests.RequestException as ex:
+        logger.debug("Image extraction request failed for link=%s: %s", link, ex)
         return None
     return None
 
@@ -223,7 +228,15 @@ def fetch_news(
     cutoff = datetime.now(tz=timezone.utc) - timedelta(days=max(1, max_age_days))
 
     for url in rss_urls:
-        feed = feedparser.parse(url)
+        try:
+            feed = feedparser.parse(url)
+        except Exception as ex:
+            logger.warning("RSS parse failed for url=%s: %s", url, ex)
+            continue
+
+        if getattr(feed, "bozo", False):
+            logger.warning("RSS feed is malformed (bozo) for url=%s: %s", url, getattr(feed, "bozo_exception", "unknown"))
+
         source = feed.feed.get("title", "Unknown source")
         for entry in feed.entries:
             published_at = _to_datetime(entry)

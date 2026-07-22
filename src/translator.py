@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import Optional
 
 from deep_translator import GoogleTranslator
 
 from src.llm import chat_completion
+
+logger = logging.getLogger(__name__)
 
 
 def _looks_like_target_language(text: str, target_language: str) -> bool:
@@ -49,15 +52,27 @@ def translate_text(
                 max_tokens=700,
             )
             if out and _looks_like_target_language(out, target_language):
+                logger.info(
+                    "LLM translation succeeded target_language=%s output_chars=%s",
+                    target_language,
+                    len(out),
+                )
                 return out
-        except Exception:
-            pass
+            if out:
+                logger.warning(
+                    "LLM translation returned text not matching target language '%s'; fallback translator will be used.",
+                    target_language,
+                )
+            else:
+                logger.warning("LLM translation returned empty response; fallback translator will be used.")
+        except Exception as ex:
+            logger.warning("LLM translation failed; fallback translator will be used: %s", ex)
 
     try:
         out = GoogleTranslator(source="auto", target=target_language).translate(text)
         if out and _looks_like_target_language(out, target_language):
             return out
-    except Exception:
-        pass
+    except Exception as ex:
+        logger.warning("Fallback translator failed for target_language=%s: %s", target_language, ex)
 
     return None
