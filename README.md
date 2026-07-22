@@ -135,6 +135,18 @@ chmod +x scripts/update_service.sh
 ./scripts/update_service.sh
 ```
 
+If the repository is owned by `news-bot` (recommended for `/opt/news-bot`), run updates as that user:
+
+```bash
+sudo -u news-bot -H bash -lc 'cd /opt/news-bot && git pull --rebase origin main'
+```
+
+If Git shows `fatal: detected dubious ownership in repository at '/opt/news-bot'`, either use the correct owner account (recommended) or mark the directory as safe for that user:
+
+```bash
+sudo -u news-bot -H git config --global --add safe.directory /opt/news-bot
+```
+
 Script behavior:
 - if `SERVICE` is set, restarts only that unit;
 - if `SERVICE` is empty, auto-detects and restarts all `news-bot@*.service` units;

@@ -135,6 +135,18 @@ chmod +x scripts/update_service.sh
 ./scripts/update_service.sh
 ```
 
+Если репозиторий принадлежит пользователю `news-bot` (рекомендуется для `/opt/news-bot`), выполняйте обновление от его имени:
+
+```bash
+sudo -u news-bot -H bash -lc 'cd /opt/news-bot && git pull --rebase origin main'
+```
+
+Если Git показывает `fatal: detected dubious ownership in repository at '/opt/news-bot'`, используйте аккаунт владельца (рекомендуется) или добавьте каталог в safe-directory для этого пользователя:
+
+```bash
+sudo -u news-bot -H git config --global --add safe.directory /opt/news-bot
+```
+
 Поведение скрипта:
 - если задан `SERVICE`, перезапускается только этот unit;
 - если `SERVICE` пустой, скрипт автоматически находит и перезапускает все `news-bot@*.service`;
