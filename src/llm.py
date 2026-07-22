@@ -89,28 +89,60 @@ def chat_completion(
         )
         return None
 
-    message = choices[0].get("message") or {}
+    choice0 = choices[0] if isinstance(choices[0], dict) else {}
+    finish_reason = choice0.get("finish_reason")
+    usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+    usage_prompt_tokens = usage.get("prompt_tokens")
+    usage_completion_tokens = usage.get("completion_tokens")
+    usage_total_tokens = usage.get("total_tokens")
+    choice0_meta = {
+        "index": choice0.get("index"),
+        "finish_reason": finish_reason,
+        "logprobs": choice0.get("logprobs"),
+    }
+
+    message = choice0.get("message") or {}
     content = message.get("content")
     if isinstance(content, str):
         content = content.strip()
         elapsed_ms = int((time.monotonic() - started_at) * 1000)
         logger.info(
-            "LLM response received endpoint=%s model=%s status=%s elapsed_ms=%s content_chars=%s",
+            "LLM response received endpoint=%s model=%s status=%s elapsed_ms=%s content_chars=%s "
+            "finish_reason=%s usage_prompt_tokens=%s usage_completion_tokens=%s usage_total_tokens=%s",
             endpoint,
             model,
             response.status_code,
             elapsed_ms,
             len(content),
+            finish_reason,
+            usage_prompt_tokens,
+            usage_completion_tokens,
+            usage_total_tokens,
         )
+        if not content:
+            logger.warning(
+                "LLM returned empty string content endpoint=%s model=%s status=%s finish_reason=%s choice0_meta=%s",
+                endpoint,
+                model,
+                response.status_code,
+                finish_reason,
+                choice0_meta,
+            )
         return content or None
 
     elapsed_ms = int((time.monotonic() - started_at) * 1000)
     logger.warning(
-        "LLM response content is not string endpoint=%s model=%s status=%s elapsed_ms=%s content_type=%s",
+        "LLM response content is not string endpoint=%s model=%s status=%s elapsed_ms=%s content_type=%s "
+        "finish_reason=%s choice0_meta=%s usage_prompt_tokens=%s usage_completion_tokens=%s usage_total_tokens=%s",
         endpoint,
         model,
         response.status_code,
         elapsed_ms,
         type(content).__name__,
+        finish_reason,
+        choice0_meta,
+        usage_prompt_tokens,
+        usage_completion_tokens,
+        usage_total_tokens,
     )
     return None
