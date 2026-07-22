@@ -33,7 +33,7 @@ def translate_text(
     llm_model: str = "gpt-4.1-mini",
     llm_base_url: str = "https://api.openai.com/v1",
     use_llm_translation: bool = False,
-    llm_max_tokens: int = 1200,
+    llm_max_tokens: int = 2000,
 ) -> Optional[str]:
     if not text.strip():
         return text

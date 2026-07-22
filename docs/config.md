@@ -44,8 +44,8 @@ For a minimal startup config, see `.env.example` and README.
 - `LLM_API_KEY` (default: empty) - API key for provider.
 - `LLM_MODEL` (default: `gpt-4.1-mini`) - model name.
 - `LLM_BASE_URL` (default: `https://api.openai.com/v1`) - API base URL.
-- `LLM_TRANSLATION_MAX_TOKENS` (default: `1200`) - completion-token limit for each LLM translation.
-- `LLM_SUMMARY_MAX_TOKENS` (default: `1000`) - completion-token limit for each LLM summary.
+- `LLM_TRANSLATION_MAX_TOKENS` (default: `2000`) - completion-token limit for each LLM translation.
+- `LLM_SUMMARY_MAX_TOKENS` (default: `2000`) - completion-token limit for each LLM summary.
 - `SUMMARY_MAX_LINES` (default: `3`) - number of summary lines.
 - `LLM_SUMMARY_PROMPT` - summary prompt template with `{target_language}` and `{summary_max_lines}` placeholders.
 
