@@ -31,6 +31,7 @@ def summarize_text(
     llm_base_url: str = "https://api.openai.com/v1",
     prompt_template: Optional[str] = None,
     summary_max_lines: int = 2,
+    llm_max_tokens: int = 600,
 ) -> str:
     if not text.strip():
         return ""
@@ -63,7 +64,7 @@ def summarize_text(
             model=llm_model,
             system_prompt=prompt,
             user_text=text,
-            max_tokens=220,
+            max_tokens=llm_max_tokens,
             temperature=0.1,
         )
         if out:

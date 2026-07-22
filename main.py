@@ -425,6 +425,7 @@ def job() -> None:
             llm_model=settings.llm_model,
             llm_base_url=settings.llm_base_url,
             use_llm_translation=settings.llm_enabled,
+            llm_max_tokens=settings.llm_translation_max_tokens,
         )
         if not translated:
             logger.warning("Skipped (translation failed for body): %s", item.link)
@@ -452,6 +453,7 @@ def job() -> None:
             llm_base_url=settings.llm_base_url,
             prompt_template=settings.llm_summary_prompt,
             summary_max_lines=settings.summary_max_lines,
+            llm_max_tokens=settings.llm_summary_max_tokens,
         )
         summary = strip_ui_noise(summary)
         title = translate_text(
@@ -461,6 +463,7 @@ def job() -> None:
             llm_model=settings.llm_model,
             llm_base_url=settings.llm_base_url,
             use_llm_translation=settings.llm_enabled,
+            llm_max_tokens=settings.llm_translation_max_tokens,
         )
         if not title:
             logger.warning("Skipped (translation failed for title): %s", item.link)
