@@ -138,7 +138,7 @@ chmod +x scripts/update_service.sh
 If the repository is owned by `news-bot` (recommended for `/opt/news-bot`), run updates as that user:
 
 ```bash
-sudo -u news-bot -H bash -lc 'cd /opt/news-bot && git pull --rebase origin main'
+sudo -u news-bot -H bash -lc 'cd /opt/news-bot && git pull --rebase origin master'
 ```
 
 If Git shows `fatal: detected dubious ownership in repository at '/opt/news-bot'`, either use the correct owner account (recommended) or mark the directory as safe for that user:

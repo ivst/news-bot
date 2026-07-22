@@ -138,7 +138,7 @@ chmod +x scripts/update_service.sh
 Если репозиторий принадлежит пользователю `news-bot` (рекомендуется для `/opt/news-bot`), выполняйте обновление от его имени:
 
 ```bash
-sudo -u news-bot -H bash -lc 'cd /opt/news-bot && git pull --rebase origin main'
+sudo -u news-bot -H bash -lc 'cd /opt/news-bot && git pull --rebase origin master'
 ```
 
 Если Git показывает `fatal: detected dubious ownership in repository at '/opt/news-bot'`, используйте аккаунт владельца (рекомендуется) или добавьте каталог в safe-directory для этого пользователя:
