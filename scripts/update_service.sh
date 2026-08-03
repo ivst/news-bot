@@ -8,7 +8,7 @@ BRANCH="${BRANCH:-master}"
 TEMPLATE_GLOB="${TEMPLATE_GLOB:-news-bot@*.service}"
 
 cd "$APP_DIR"
-sudo -u "$APP_USER" git pull origin "$BRANCH"
+sudo -u "$APP_USER" git pull --ff-only origin "$BRANCH"
 sudo -u "$APP_USER" "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt"
 
 declare -a services=()
