@@ -82,7 +82,7 @@ Common settings:
 | `SCHEDULE_CRON` | Publication schedule (default: `*/30 * * * *`) |
 | `MAX_NEWS_PER_RUN` | Maximum successfully processed items per cycle (default: `3`) |
 | `VK_DRAFT_MODE` | Create postponed VK posts instead of publishing immediately (default: `false`) |
-| `DIRECT_PUBLISH_ENABLED` | Publish directly to configured Telegram/VK channels (default: `true`); when disabled, configure Hub delivery |
+| `DIRECT_PUBLISH_ENABLED` | Publish directly to configured Telegram/VK channels (default: `true`); when disabled, configure Hub delivery and `HUB_CHANNELS` |
 
 Advanced settings (LLM, Hub integration, deduplication, etc.) are documented in [docs/config.md](docs/config.md).
 

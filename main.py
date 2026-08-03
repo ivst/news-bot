@@ -390,10 +390,23 @@ def job() -> None:
             break
 
         channels: list[tuple[str, object]] = []
-        if tg.enabled and tg_active and not store.is_seen("telegram", item.link):
-            channels.append(("telegram", tg))
-        if vk.enabled and vk_active and not vk_daily_limit_reached and not store.is_seen("vk", item.link):
-            channels.append(("vk", vk))
+        if settings.direct_publish_enabled:
+            if tg.enabled and tg_active and not store.is_seen("telegram", item.link):
+                channels.append(("telegram", tg))
+            if vk.enabled and vk_active and not vk_daily_limit_reached and not store.is_seen("vk", item.link):
+                channels.append(("vk", vk))
+        elif settings.hub_enabled:
+            # In Hub-only mode publisher credentials are intentionally not
+            # required. HUB_CHANNELS determines which delivery jobs to create.
+            if "telegram" in settings.hub_channels and tg_active and not store.is_seen("telegram", item.link):
+                channels.append(("telegram", tg))
+            if (
+                "vk" in settings.hub_channels
+                and vk_active
+                and not vk_daily_limit_reached
+                and not store.is_seen("vk", item.link)
+            ):
+                channels.append(("vk", vk))
         if not channels:
             continue
 

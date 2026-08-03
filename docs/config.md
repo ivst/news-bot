@@ -83,6 +83,7 @@ Similarity dedup:
 - `HUB_ENABLED` (default: `false`) - enable external `news-hub` delivery.
 - `HUB_BASE_URL` (default: empty) - hub API base URL.
 - `HUB_API_KEY` (default: empty) - hub API key.
+- `HUB_CHANNELS` (default: `telegram,vk`) - comma-separated Hub delivery channels used when direct publishing is disabled.
 - `HUB_TIMEOUT_SECONDS` (default: `15`) - hub request timeout.
 - `HUB_CREATE_JOBS` (default: `true`) - create per-channel jobs in hub.
 - `HUB_SEND_DUPLICATES` (default: `false`) - send duplicate items/jobs to hub.

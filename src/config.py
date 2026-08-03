@@ -56,6 +56,7 @@ class Settings:
     hub_enabled: bool
     hub_base_url: str | None
     hub_api_key: str | None
+    hub_channels: List[str]
     hub_timeout_seconds: int
     hub_create_jobs: bool
     hub_send_duplicates: bool
@@ -66,6 +67,16 @@ def _to_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _parse_channels(value: str | None) -> List[str]:
+    allowed = {"telegram", "vk"}
+    channels: List[str] = []
+    for channel in (value or "telegram,vk").split(","):
+        normalized = channel.strip().lower()
+        if normalized in allowed and normalized not in channels:
+            channels.append(normalized)
+    return channels
 
 
 def load_settings() -> Settings:
@@ -129,6 +140,7 @@ def load_settings() -> Settings:
         hub_enabled=_to_bool(os.getenv("HUB_ENABLED"), default=False),
         hub_base_url=(os.getenv("HUB_BASE_URL") or "").strip().rstrip("/") or None,
         hub_api_key=(os.getenv("HUB_API_KEY") or "").strip() or None,
+        hub_channels=_parse_channels(os.getenv("HUB_CHANNELS")),
         hub_timeout_seconds=max(3, int(os.getenv("HUB_TIMEOUT_SECONDS", "15"))),
         hub_create_jobs=_to_bool(os.getenv("HUB_CREATE_JOBS"), default=True),
         hub_send_duplicates=_to_bool(os.getenv("HUB_SEND_DUPLICATES"), default=False),

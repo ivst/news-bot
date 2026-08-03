@@ -17,6 +17,8 @@ from src.text_cleaner import strip_ui_noise
 
 logger = logging.getLogger(__name__)
 
+_RSS_TIMEOUT_SECONDS = 20
+
 
 @dataclass
 class NewsItem:
@@ -29,15 +31,31 @@ class NewsItem:
 
 
 def _to_datetime(entry) -> datetime:
-    if "published" in entry:
+    for field in ("published", "updated"):
+        value = entry.get(field)
+        if not value:
+            continue
         try:
-            dt = parsedate_to_datetime(entry.published)
+            dt = parsedate_to_datetime(str(value))
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
-            return dt
+            return dt.astimezone(timezone.utc)
         except Exception:
             pass
-    return datetime.now(tz=timezone.utc)
+
+    # feedparser exposes parsed dates separately for some feeds.
+    for field in ("published_parsed", "updated_parsed"):
+        value = entry.get(field)
+        if not value:
+            continue
+        try:
+            return datetime(*value[:6], tzinfo=timezone.utc)
+        except (TypeError, ValueError, IndexError):
+            pass
+
+    # Unknown dates must not bypass NEWS_MAX_AGE_DAYS and flood the bot with
+    # old entries. The minimum datetime also makes the item easy to filter.
+    return datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _extract_text(raw: str) -> str:
@@ -229,7 +247,13 @@ def fetch_news(
 
     for url in rss_urls:
         try:
-            feed = feedparser.parse(url)
+            response = requests.get(
+                url,
+                timeout=_RSS_TIMEOUT_SECONDS,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; NewsBot/1.0)"},
+            )
+            response.raise_for_status()
+            feed = feedparser.parse(response.content)
         except Exception as ex:
             logger.warning("RSS parse failed for url=%s: %s", url, ex)
             continue
