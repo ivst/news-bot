@@ -50,6 +50,7 @@ class Settings:
     event_tag_dedup_min_tokens: int
     similar_dedup_enabled: bool
     similar_dedup_window: int
+    dedup_recent_published_limit: int
     similar_dedup_threshold: float
     similar_dedup_token_threshold: float
     similar_dedup_min_overlap_tokens: int
@@ -61,6 +62,13 @@ class Settings:
     hub_create_jobs: bool
     hub_send_duplicates: bool
     direct_publish_enabled: bool
+    enrichment_enabled: bool
+    enrichment_mode: str
+    enrichment_search_provider: str
+    enrichment_search_endpoint: str
+    enrichment_search_api_key: str | None
+    enrichment_timeout_seconds: int
+    enrichment_max_sources: int
 
 
 def _to_bool(value: str | None, default: bool = False) -> bool:
@@ -131,6 +139,10 @@ def load_settings() -> Settings:
         event_tag_dedup_min_tokens=max(2, int(os.getenv("EVENT_TAG_DEDUP_MIN_TOKENS", "4"))),
         similar_dedup_enabled=_to_bool(os.getenv("SIMILAR_DEDUP_ENABLED"), default=True),
         similar_dedup_window=max(1, int(os.getenv("SIMILAR_DEDUP_WINDOW", "15"))),
+        dedup_recent_published_limit=max(
+            1,
+            int(os.getenv("DEDUP_RECENT_PUBLISHED_LIMIT", os.getenv("SIMILAR_DEDUP_WINDOW", "15"))),
+        ),
         similar_dedup_threshold=min(1.0, max(0.0, float(os.getenv("SIMILAR_DEDUP_THRESHOLD", "0.90")))),
         similar_dedup_token_threshold=min(
             1.0,
@@ -145,4 +157,16 @@ def load_settings() -> Settings:
         hub_create_jobs=_to_bool(os.getenv("HUB_CREATE_JOBS"), default=True),
         hub_send_duplicates=_to_bool(os.getenv("HUB_SEND_DUPLICATES"), default=False),
         direct_publish_enabled=_to_bool(os.getenv("DIRECT_PUBLISH_ENABLED"), default=True),
+        # Keep existing standalone deployments behavior-compatible. Enrichment
+        # is opt-in so an old .env does not suddenly add network requests or
+        # change the publication text.
+        enrichment_enabled=_to_bool(os.getenv("ENRICHMENT_ENABLED"), default=False),
+        enrichment_mode=(os.getenv("ENRICHMENT_MODE", "source_then_search").strip().lower() or "source_then_search"),
+        enrichment_search_provider=(os.getenv("ENRICHMENT_SEARCH_PROVIDER", "brave").strip().lower() or "brave"),
+        enrichment_search_endpoint=(
+            os.getenv("ENRICHMENT_SEARCH_ENDPOINT", "https://api.search.brave.com/res/v1/web/search").strip()
+        ),
+        enrichment_search_api_key=(os.getenv("ENRICHMENT_SEARCH_API_KEY") or "").strip() or None,
+        enrichment_timeout_seconds=max(3, int(os.getenv("ENRICHMENT_TIMEOUT_SECONDS", "15"))),
+        enrichment_max_sources=max(1, int(os.getenv("ENRICHMENT_MAX_SOURCES", "3"))),
     )

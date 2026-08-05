@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import html
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import List, Optional
@@ -28,6 +28,9 @@ class NewsItem:
     published_at: datetime
     content: str
     image_url: Optional[str]
+    source_documents: list[dict] = field(default_factory=list)
+    enrichment_status: str = "rss_only"
+    enrichment_query: Optional[str] = None
 
 
 def _to_datetime(entry) -> datetime:

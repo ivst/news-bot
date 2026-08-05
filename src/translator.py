@@ -11,6 +11,35 @@ from src.llm import chat_completion
 logger = logging.getLogger(__name__)
 
 
+def _translate_google_in_chunks(text: str, target_language: str) -> Optional[str]:
+    # Google Translate rejects sufficiently long single requests. Paragraph
+    # chunks keep source enrichment useful in the no-LLM standalone mode.
+    chunks: list[str] = []
+    current = ""
+    for paragraph in text.splitlines():
+        paragraph = paragraph.strip()
+        if not paragraph:
+            continue
+        candidate = f"{current}\n\n{paragraph}".strip()
+        if current and len(candidate) > 4000:
+            chunks.append(current)
+            current = paragraph
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    if not chunks:
+        return ""
+
+    translated_chunks: list[str] = []
+    for chunk in chunks:
+        translated = GoogleTranslator(source="auto", target=target_language).translate(chunk)
+        if not translated:
+            return None
+        translated_chunks.append(translated)
+    return "\n\n".join(translated_chunks)
+
+
 def _looks_like_target_language(text: str, target_language: str) -> bool:
     lang = (target_language or "").strip().lower().split("-", 1)[0]
     if lang in {"ru", "uk", "bg"}:
@@ -70,7 +99,7 @@ def translate_text(
             logger.warning("LLM translation failed; fallback translator will be used: %s", ex)
 
     try:
-        out = GoogleTranslator(source="auto", target=target_language).translate(text)
+        out = _translate_google_in_chunks(text, target_language)
         if out and _looks_like_target_language(out, target_language):
             return out
     except Exception as ex:

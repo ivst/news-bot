@@ -49,6 +49,11 @@ class HubClient:
         language: str,
         image_url: Optional[str],
         suggested_channels: Iterable[str],
+        metadata: Optional[dict] = None,
+        source_documents: Optional[list[dict]] = None,
+        enrichment_status: Optional[str] = None,
+        enrichment_query: Optional[str] = None,
+        publication_mode: str = "automatic",
     ) -> int | None:
         if not self.enabled:
             return None
@@ -64,6 +69,11 @@ class HubClient:
             "language": language,
             "image_url": image_url,
             "suggested_channels": [c for c in suggested_channels if c in {"vk", "telegram"}],
+            "metadata": metadata or {},
+            "source_documents": source_documents or [],
+            "enrichment_status": enrichment_status or "rss_only",
+            "enrichment_query": enrichment_query,
+            "publication_mode": publication_mode,
         }
         started_at = time.monotonic()
         logger.debug(

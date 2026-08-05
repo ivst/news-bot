@@ -74,9 +74,10 @@ Event-tag dedup:
 Similarity dedup:
 - `SIMILAR_DEDUP_ENABLED` (default: `true`)
 - `SIMILAR_DEDUP_WINDOW` (default: `15`)
-- `SIMILAR_DEDUP_THRESHOLD` (default: `0.90`)
-- `SIMILAR_DEDUP_TOKEN_THRESHOLD` (default: `0.72`)
-- `SIMILAR_DEDUP_MIN_OVERLAP_TOKENS` (default: `6`)
+- `DEDUP_RECENT_PUBLISHED_LIMIT` (default: `100`) - number of recent published items scanned by similarity deduplication. It takes precedence over the legacy window setting.
+- `SIMILAR_DEDUP_THRESHOLD` (default: `0.90`) - high-confidence sequence threshold; paraphrase matching also uses character n-grams and event tokens.
+- `SIMILAR_DEDUP_TOKEN_THRESHOLD` (default: `0.72`) - token overlap-coefficient threshold.
+- `SIMILAR_DEDUP_MIN_OVERLAP_TOKENS` (default: `6`) - substantive shared tokens required for body matching.
 
 ## Hub Integration
 
@@ -88,3 +89,13 @@ Similarity dedup:
 - `HUB_CREATE_JOBS` (default: `true`) - create per-channel jobs in hub.
 - `HUB_SEND_DUPLICATES` (default: `false`) - send duplicate items/jobs to hub.
 - `DIRECT_PUBLISH_ENABLED` (default: `true`) - direct channel publishing switch.
+
+## Source enrichment
+
+- `ENRICHMENT_ENABLED` (default: `false`) - load the original article before translation. Enable explicitly for existing deployments.
+- `ENRICHMENT_MODE` (default: `source_then_search`) - `disabled`, `source_only`, `source_then_search`, or `search_only`.
+- `ENRICHMENT_SEARCH_PROVIDER` (default: `brave`) - currently supported provider.
+- `ENRICHMENT_SEARCH_ENDPOINT` (default: Brave Web Search API endpoint).
+- `ENRICHMENT_SEARCH_API_KEY` (default: empty) - provider key. Without it, RSS content is retained when the source is unavailable.
+- `ENRICHMENT_TIMEOUT_SECONDS` (default: `15`) - request timeout for source/search requests.
+- `ENRICHMENT_MAX_SOURCES` (default: `3`) - maximum fetched documents in search fallback.

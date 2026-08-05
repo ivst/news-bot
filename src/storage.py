@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Tuple
+from typing import Iterator, List, Tuple
 
 
 class SeenNewsStore:
@@ -12,8 +13,18 @@ class SeenNewsStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
-    def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.db_path)
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        conn = sqlite3.connect(self.db_path)
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        else:
+            conn.commit()
+        finally:
+            conn.close()
 
     def _init_db(self) -> None:
         with self._connect() as conn:
@@ -137,6 +148,21 @@ class SeenNewsStore:
                 (channel, limit),
             ).fetchall()
             return [(str(r[0]), str(r[1])) for r in rows]
+
+    def get_recent_published_records(self, channel: str, limit: int) -> List[Tuple[str, str, str, str]]:
+        """Return title, summary, normalized text and link for similarity checks."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT title, summary, text_norm, link
+                FROM post_attempts
+                WHERE channel = ? AND status = 'published'
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (channel, limit),
+            ).fetchall()
+            return [(str(r[0]), str(r[1]), str(r[2]), str(r[3])) for r in rows]
 
     def get_published_attempts_since(self, channel: str, days: int) -> List[Tuple[str, str, str]]:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=max(1, days))).isoformat()

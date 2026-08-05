@@ -14,6 +14,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from src.config import load_settings
+from src.enrichment import enrich_news_item
 from src.feeds import fetch_news
 from src.hub_client import HubClient
 from src.link_shortener import shorten_url
@@ -190,11 +191,35 @@ def _token_jaccard(a_tokens: set[str], b_tokens: set[str]) -> tuple[float, int]:
     return overlap / union, overlap
 
 
+def _token_overlap_coefficient(a_tokens: set[str], b_tokens: set[str]) -> tuple[float, int]:
+    if not a_tokens or not b_tokens:
+        return 0.0, 0
+    overlap = len(a_tokens & b_tokens)
+    return overlap / min(len(a_tokens), len(b_tokens)), overlap
+
+
+def _char_ngram_set(text: str, n: int = 3) -> set[str]:
+    compact = re.sub(r"\s+", " ", text).strip()
+    if len(compact) < n:
+        return {compact} if compact else set()
+    return {compact[index : index + n] for index in range(len(compact) - n + 1)}
+
+
+def _char_ngram_jaccard(a: str, b: str, n: int = 3) -> float:
+    left = _char_ngram_set(a, n)
+    right = _char_ngram_set(b, n)
+    if not left or not right:
+        return 0.0
+    return len(left & right) / len(left | right)
+
+
 def _find_similar_recent(
     store: SeenNewsStore,
     *,
     channel: str,
     text_norm: str,
+    title: str = "",
+    summary: str = "",
     window: int,
     threshold: float,
     token_threshold: float,
@@ -203,27 +228,49 @@ def _find_similar_recent(
     best_score = 0.0
     best_link = None
     best_reason = ""
-    curr_tokens = _token_set(text_norm)
-    for old_text_norm, old_link in store.get_recent_published_texts(channel, window):
-        seq_score = _similarity_ratio(text_norm, old_text_norm)
-        old_tokens = _token_set(old_text_norm)
+    curr_title = _normalize_for_similarity(title) if title else ""
+    curr_body = _normalize_for_similarity(summary or text_norm)
+    curr_tokens = _token_set(curr_body)
+    curr_event_tokens = _event_token_set(title, summary or text_norm)
+    for old_title, old_summary, old_text_norm, old_link in store.get_recent_published_records(channel, window):
+        old_title_norm = _normalize_for_similarity(old_title)
+        old_body = _normalize_for_similarity(old_summary or old_text_norm)
+        old_tokens = _token_set(old_body)
+        title_seq = _similarity_ratio(curr_title, old_title_norm)
+        body_seq = _similarity_ratio(curr_body, old_body)
         token_score, overlap = _token_jaccard(curr_tokens, old_tokens)
+        overlap_score, overlap_count = _token_overlap_coefficient(curr_tokens, old_tokens)
+        ngram_score = _char_ngram_jaccard(curr_body, old_body)
+        event_score, event_overlap = _event_overlap(curr_event_tokens, _event_token_set(old_title, old_summary or old_text_norm))
+        title_token_score, title_overlap = _token_overlap_coefficient(
+            _token_set(curr_title),
+            _token_set(old_title_norm),
+        )
 
-        is_seq_match = seq_score >= threshold
-        is_token_match = token_score >= token_threshold and overlap >= min_overlap_tokens
-        score = max(seq_score, token_score)
+        # SequenceMatcher alone is too brittle for paraphrases, while plain
+        # Jaccard is too sensitive to article length. Require meaningful token
+        # overlap and combine title, body, character n-grams and event tokens.
+        is_exact_match = bool(curr_body and curr_body == old_body)
+        is_title_match = title_seq >= 0.78 and title_overlap >= 2
+        is_body_match = (
+            (body_seq >= threshold or ngram_score >= max(0.55, threshold - 0.30) or overlap_score >= token_threshold)
+            and max(overlap, overlap_count) >= min_overlap_tokens
+        )
+        is_event_match = event_overlap >= max(3, min_overlap_tokens - 2) and event_score >= 0.55
+        is_compound_match = title_token_score >= 0.60 and title_overlap >= 2 and event_overlap >= 3 and event_score >= 0.45
+        is_match = is_exact_match or is_title_match or is_body_match or is_event_match or is_compound_match
+        score = max(body_seq, ngram_score, overlap_score, event_score, title_seq)
 
         if score > best_score:
             best_score = score
             best_link = old_link
-            if is_seq_match:
-                best_reason = f"sequence:{seq_score:.3f}"
-            elif is_token_match:
-                best_reason = f"token_jaccard:{token_score:.3f},overlap:{overlap}"
-            else:
-                best_reason = f"best_non_match:sequence:{seq_score:.3f},token_jaccard:{token_score:.3f},overlap:{overlap}"
+            best_reason = (
+                f"body_sequence:{body_seq:.3f},ngram:{ngram_score:.3f},"
+                f"token_overlap:{overlap_score:.3f},event:{event_score:.3f},"
+                f"overlap:{max(overlap, overlap_count)},event_overlap:{event_overlap}"
+            )
 
-        if is_seq_match or is_token_match:
+        if is_match:
             return True, score, old_link, best_reason
 
     return False, best_score, best_link, best_reason
@@ -431,6 +478,27 @@ def job() -> None:
             continue
 
         source_text = item.content if item.content else item.title
+        enrichment = enrich_news_item(
+            item,
+            enabled=settings.enrichment_enabled,
+            mode=settings.enrichment_mode,
+            search_provider=settings.enrichment_search_provider,
+            search_endpoint=settings.enrichment_search_endpoint,
+            search_api_key=settings.enrichment_search_api_key,
+            timeout_seconds=settings.enrichment_timeout_seconds,
+            max_sources=settings.enrichment_max_sources,
+        )
+        item.content = enrichment.text or source_text
+        item.source_documents = enrichment.documents
+        item.enrichment_status = enrichment.status
+        item.enrichment_query = enrichment.query
+        source_text = item.content
+        logger.info(
+            "Source enrichment completed link=%s status=%s documents=%s",
+            item.link,
+            enrichment.status,
+            len(enrichment.documents),
+        )
         translated = translate_text(
             source_text,
             settings.target_language,
@@ -534,6 +602,26 @@ def job() -> None:
                     language=settings.target_language,
                     image_url=item.image_url,
                     suggested_channels=[channel_name for channel_name, _ in channels],
+                    metadata={
+                        "source": item.source,
+                        "enrichment": {
+                            "status": enrichment.status,
+                            "query": enrichment.query,
+                            "documents": enrichment.documents,
+                        },
+                        "dedup": {
+                            "event_key": dedup_key,
+                            "event_tokens": dedup_tokens,
+                            "dedup_version": dedup_version,
+                        },
+                        "rss": {
+                            "published_at": item.published_at.astimezone(timezone.utc).isoformat(),
+                        },
+                    },
+                    source_documents=enrichment.documents,
+                    enrichment_status=enrichment.status,
+                    enrichment_query=enrichment.query,
+                    publication_mode="automatic" if not settings.direct_publish_enabled else "manual",
                 )
                 return hub_item_id
             except Exception as ex:
@@ -679,8 +767,10 @@ def job() -> None:
                     is_similar, score, match_link, similarity_reason = _find_similar_recent(
                         store,
                         channel=channel_name,
+                        title=title,
+                        summary=summary,
                         text_norm=text_norm,
-                        window=settings.similar_dedup_window,
+                        window=settings.dedup_recent_published_limit,
                         threshold=settings.similar_dedup_threshold,
                         token_threshold=settings.similar_dedup_token_threshold,
                         min_overlap_tokens=settings.similar_dedup_min_overlap_tokens,
