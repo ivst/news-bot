@@ -27,6 +27,8 @@ class Settings:
     vk_active_hours: str | None
     vk_show_source: bool
     vk_photo_upload_enabled: bool
+    vk_photo_upload_retries: int
+    vk_photo_upload_retry_backoff_seconds: float
     vk_draft_mode: bool
     vk_draft_delay_minutes: int
     vk_daily_post_limit: int
@@ -115,6 +117,11 @@ def load_settings() -> Settings:
         vk_active_hours=(os.getenv("VK_ACTIVE_HOURS") or "").strip() or None,
         vk_show_source=_to_bool(os.getenv("VK_SHOW_SOURCE"), default=True),
         vk_photo_upload_enabled=_to_bool(os.getenv("VK_PHOTO_UPLOAD_ENABLED"), default=True),
+        vk_photo_upload_retries=max(1, int(os.getenv("VK_PHOTO_UPLOAD_RETRIES", "3"))),
+        vk_photo_upload_retry_backoff_seconds=max(
+            0.0,
+            float(os.getenv("VK_PHOTO_UPLOAD_RETRY_BACKOFF_SECONDS", "1")),
+        ),
         vk_draft_mode=_to_bool(os.getenv("VK_DRAFT_MODE"), default=False),
         vk_draft_delay_minutes=max(10, int(os.getenv("VK_DRAFT_DELAY_MINUTES", "43200"))),
         vk_daily_post_limit=max(0, int(os.getenv("VK_DAILY_POST_LIMIT", "0"))),

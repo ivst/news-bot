@@ -379,6 +379,8 @@ def job() -> None:
         settings.vk_group_id,
         settings.vk_access_token,
         photo_upload_enabled=settings.vk_photo_upload_enabled,
+        photo_upload_retries=settings.vk_photo_upload_retries,
+        photo_upload_retry_backoff_seconds=settings.vk_photo_upload_retry_backoff_seconds,
         draft_mode=settings.vk_draft_mode,
         draft_delay_minutes=settings.vk_draft_delay_minutes,
     )

@@ -34,6 +34,8 @@ For a minimal startup config, see `.env.example` and README.
 - `VK_ACTIVE_HOURS` (default: empty) - active window `HH-HH`; empty means 24/7.
 - `VK_SHOW_SOURCE` (default: `true`) - include source marker/link in VK text.
 - `VK_PHOTO_UPLOAD_ENABLED` (default: `true`) - upload/expose image attachments in VK.
+- `VK_PHOTO_UPLOAD_RETRIES` (default: `3`) - number of attempts with a fresh VK upload server and source download.
+- `VK_PHOTO_UPLOAD_RETRY_BACKOFF_SECONDS` (default: `1`) - exponential retry backoff base in seconds.
 - `VK_DRAFT_MODE` (default: `false`) - publish as postponed draft posts.
 - `VK_DRAFT_DELAY_MINUTES` (default: `43200`) - draft delay in minutes.
 - `VK_DAILY_POST_LIMIT` (default: `0`) - per-day VK cap (`0` means unlimited).

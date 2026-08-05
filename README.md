@@ -110,6 +110,8 @@ To publish an AI-edited post based on the enriched article, enable `LLM_REWRITE_
 
 The standalone deduplication checks the configured number of recent published posts using normalized links, titles, text similarity, character n-grams, and event tokens. Configure the window with `DEDUP_RECENT_PUBLISHED_LIMIT` (the legacy `SIMILAR_DEDUP_WINDOW` remains supported).
 
+VK image upload retries use a fresh upload server and a normalized JPEG on each attempt. Configure `VK_PHOTO_UPLOAD_RETRIES` and `VK_PHOTO_UPLOAD_RETRY_BACKOFF_SECONDS`; if all attempts fail, the post is published without the image.
+
 ## Tests
 
 Run the bot test suite with:

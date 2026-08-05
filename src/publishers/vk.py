@@ -30,10 +30,14 @@ class VKPublisher:
         photo_upload_enabled: bool = True,
         draft_mode: bool = False,
         draft_delay_minutes: int = 43200,
+        photo_upload_retries: int = 3,
+        photo_upload_retry_backoff_seconds: float = 1.0,
     ):
         self.group_id = group_id
         self.access_token = access_token
         self.photo_upload_enabled = photo_upload_enabled
+        self.photo_upload_retries = max(1, photo_upload_retries)
+        self.photo_upload_retry_backoff_seconds = max(0.0, photo_upload_retry_backoff_seconds)
         self.draft_mode = draft_mode
         self.draft_delay_minutes = max(10, draft_delay_minutes)
         self._photo_upload_disabled_by_auth = False
@@ -98,6 +102,36 @@ class VKPublisher:
         if not image_url or not self.photo_upload_enabled or self._photo_upload_disabled_by_auth:
             return None
 
+        last_error: Optional[Exception] = None
+        for attempt in range(1, self.photo_upload_retries + 1):
+            try:
+                result = self._upload_wall_photo_once(image_url, source_link=source_link)
+                if result is None or self._photo_upload_disabled_by_auth:
+                    return result
+                return result
+            except Exception as ex:
+                last_error = ex
+                if attempt >= self.photo_upload_retries:
+                    break
+                delay = self.photo_upload_retry_backoff_seconds * (2 ** (attempt - 1))
+                logger.warning(
+                    "VK photo upload attempt failed attempt=%s/%s url=%s retry_in=%.1fs error=%s",
+                    attempt,
+                    self.photo_upload_retries,
+                    image_url,
+                    delay,
+                    ex,
+                )
+                if delay > 0:
+                    time.sleep(delay)
+
+        raise RuntimeError(
+            f"VK photo upload failed after {self.photo_upload_retries} attempt(s): {last_error}"
+        ) from last_error
+
+    def _upload_wall_photo_once(self, image_url: str, source_link: Optional[str] = None) -> Optional[str]:
+        """Upload using a fresh VK upload server and a fresh source download."""
+
         upload_server_payload = {
             "group_id": self.group_id,
             "access_token": self.access_token,
@@ -121,7 +155,7 @@ class VKPublisher:
         upload_server = upload_server_body.get("response") or {}
         upload_url = str(upload_server.get("upload_url") or "")
         if not upload_url:
-            return None
+            raise RuntimeError(f"VK upload server returned no upload_url: {upload_server_body}")
 
         headers = {"User-Agent": "Mozilla/5.0 (news-bot)"}
         image_resp = requests.get(image_url, timeout=30, headers=headers)
@@ -139,10 +173,16 @@ class VKPublisher:
         raw_bytes = image_resp.content
         raw_type = content_type or "image/jpeg"
         try:
-            upload_bytes, upload_type = self._to_jpeg_if_needed(raw_bytes, raw_type, image_url)
+            # Normalize every attempt to a simple RGB JPEG. This avoids retrying
+            # the same problematic PNG/WebP/EXIF payload unchanged.
+            upload_bytes = self._to_safe_jpeg(raw_bytes)
+            upload_type = "image/jpeg"
         except Exception as ex:
             logger.warning("VK image convert failed, using original bytes for %s: %s", image_url, ex)
-            upload_bytes, upload_type = raw_bytes, raw_type
+            try:
+                upload_bytes, upload_type = self._to_jpeg_if_needed(raw_bytes, raw_type, image_url)
+            except Exception:
+                upload_bytes, upload_type = raw_bytes, raw_type
 
         files = {"photo": ("news.jpg", upload_bytes, upload_type)}
         upload_resp = requests.post(upload_url, files=files, timeout=60)
@@ -150,21 +190,7 @@ class VKPublisher:
         upload_body = upload_resp.json()
         upload_photo = upload_body.get("photo")
         if not upload_photo:
-            try:
-                safe_jpeg = self._to_safe_jpeg(raw_bytes)
-                retry_files = {"photo": ("news.jpg", safe_jpeg, "image/jpeg")}
-                retry_resp = requests.post(upload_url, files=retry_files, timeout=60)
-                retry_resp.raise_for_status()
-                retry_body = retry_resp.json()
-                upload_photo = retry_body.get("photo")
-                if upload_photo:
-                    upload_body = retry_body
-                else:
-                    raise RuntimeError(
-                        f"VK upload returned empty photo payload on retry: first={upload_body}, retry={retry_body}"
-                    )
-            except Exception as ex:
-                raise RuntimeError(f"VK upload returned empty photo payload: {upload_body}; retry_error={ex}") from ex
+            raise RuntimeError(f"VK upload returned empty photo payload: {upload_body}")
 
         saved = self._api_call(
             "photos.saveWallPhoto",
@@ -178,12 +204,12 @@ class VKPublisher:
             },
         )
         if not isinstance(saved, list) or not saved:
-            return None
+            raise RuntimeError(f"VK saveWallPhoto returned an empty response: {saved}")
         first = saved[0]
         owner_id = first.get("owner_id")
         photo_id = first.get("id")
         if owner_id is None or photo_id is None:
-            return None
+            raise RuntimeError(f"VK saveWallPhoto returned an invalid photo payload: {first}")
         return f"photo{owner_id}_{photo_id}"
 
     @staticmethod
