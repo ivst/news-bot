@@ -5,8 +5,8 @@ For a minimal startup config, see `.env.example` and README.
 
 ## Required For Real Use
 
-- `TARGET_TOPIC` - topic keywords (comma-separated). Empty value disables topic filtering.
-- `RSS_URLS` - comma-separated RSS URLs.
+- `TARGET_TOPIC` - topic keywords (comma-separated) in legacy mode. Empty value disables topic filtering.
+- `RSS_URLS` - comma-separated RSS URLs in legacy mode. Use `STREAMS_CONFIG_PATH` or `STREAMS_CONFIG_JSON` for multi-stream mode.
 - One delivery channel:
   - Telegram: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
   - VK: `VK_GROUP_ID`, `VK_ACCESS_TOKEN`
@@ -19,6 +19,22 @@ For a minimal startup config, see `.env.example` and README.
 - `MAX_NEWS_PER_RUN` (default: `3`) - maximum successful items per run.
 - `NEWS_MAX_AGE_DAYS` (default: `1`) - max source item age in days.
 - `DATABASE_PATH` (default: `./data/news.db`) - SQLite database path.
+- `STREAMS_CONFIG_PATH` (default: empty) - optional path to a JSON multi-stream configuration file.
+- `STREAMS_CONFIG_JSON` (default: empty) - optional inline JSON multi-stream configuration; takes precedence over `STREAMS_CONFIG_PATH`.
+
+When a stream configuration is present, each stream has its own RSS URLs, topic keywords, schedule, per-run limit, and optional channel list. See `config/streams.example.json` for a complete example. Without either stream variable, the legacy `RSS_URLS`, `TARGET_TOPIC`, `SCHEDULE_CRON`, and `MAX_NEWS_PER_RUN` settings are used.
+
+Stream object fields:
+
+- `id` (required) - unique stable identifier; used in scheduler job IDs and history.
+- `name` (optional) - display name for logs and Hub metadata.
+- `rss_urls` (required) - array or comma-separated string of RSS URLs.
+- `target_topic` (optional) - comma-separated topic terms; defaults to global `TARGET_TOPIC`.
+- `schedule_cron` (optional) - stream schedule; defaults to global `SCHEDULE_CRON`.
+- `max_news_per_run` (optional) - stream limit; defaults to global `MAX_NEWS_PER_RUN`.
+- `channels` (optional) - array or comma-separated string containing `telegram` and/or `vk`; omitted means global channels.
+
+Deduplication is intentionally shared between streams per channel. The stream ID is stored in `post_attempts.stream_id` and included in Hub item metadata.
 
 ## Telegram
 

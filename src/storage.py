@@ -65,6 +65,7 @@ class SeenNewsStore:
                 CREATE TABLE IF NOT EXISTS post_attempts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     channel TEXT NOT NULL,
+                    stream_id TEXT,
                     link TEXT NOT NULL,
                     title TEXT NOT NULL,
                     summary TEXT NOT NULL,
@@ -87,8 +88,13 @@ class SeenNewsStore:
                 conn.execute("ALTER TABLE post_attempts ADD COLUMN event_tokens TEXT")
             if "dedup_version" not in cols:
                 conn.execute("ALTER TABLE post_attempts ADD COLUMN dedup_version TEXT")
+            if "stream_id" not in cols:
+                conn.execute("ALTER TABLE post_attempts ADD COLUMN stream_id TEXT")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_post_attempts_channel_created ON post_attempts (channel, created_at DESC)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_post_attempts_stream_created ON post_attempts (stream_id, created_at DESC)"
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_post_attempts_event_key ON post_attempts (channel, event_key)")
             conn.commit()
@@ -196,6 +202,7 @@ class SeenNewsStore:
         self,
         *,
         channel: str,
+        stream_id: str | None = None,
         link: str,
         title: str,
         summary: str,
@@ -212,11 +219,12 @@ class SeenNewsStore:
             conn.execute(
                 """
                 INSERT INTO post_attempts (
-                    channel, link, title, summary, text_norm, status, reason, similarity, event_key, event_tokens, dedup_version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    channel, stream_id, link, title, summary, text_norm, status, reason, similarity, event_key, event_tokens, dedup_version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     channel,
+                    stream_id,
                     link,
                     title,
                     summary,

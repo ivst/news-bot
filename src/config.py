@@ -1,11 +1,26 @@
 from __future__ import annotations
 
+import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 from dotenv import load_dotenv
+
+
+@dataclass(frozen=True)
+class NewsStream:
+    """Per-topic input and delivery settings for one logical news stream."""
+
+    stream_id: str
+    name: str
+    rss_urls: List[str]
+    target_topic: str
+    max_news_per_run: int
+    schedule_cron: str | None
+    channels: List[str]
 
 
 @dataclass
@@ -75,6 +90,7 @@ class Settings:
     enrichment_search_api_key: str | None
     enrichment_timeout_seconds: int
     enrichment_max_sources: int
+    streams: List[NewsStream]
 
 
 def _to_bool(value: str | None, default: bool = False) -> bool:
@@ -93,18 +109,142 @@ def _parse_channels(value: str | None) -> List[str]:
     return channels
 
 
+def _parse_stream_channels(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_channels = value.split(",")
+    elif isinstance(value, list):
+        raw_channels = value
+    else:
+        raise ValueError("stream channels must be a comma-separated string or an array")
+
+    allowed = {"telegram", "vk"}
+    channels: List[str] = []
+    unknown: List[str] = []
+    for channel in raw_channels:
+        normalized = str(channel).strip().lower()
+        if not normalized:
+            continue
+        if normalized not in allowed:
+            unknown.append(normalized)
+        elif normalized not in channels:
+            channels.append(normalized)
+    if unknown:
+        raise ValueError(f"unsupported stream channel(s): {', '.join(unknown)}")
+    return channels
+
+
+def _parse_stream_urls(value: Any) -> List[str]:
+    if isinstance(value, str):
+        return [url.strip() for url in value.split(",") if url.strip()]
+    if isinstance(value, list):
+        return [str(url).strip() for url in value if str(url).strip()]
+    if value is None:
+        return []
+    raise ValueError("stream rss_urls must be a comma-separated string or an array")
+
+
+def _normalize_stream_id(value: Any, index: int) -> str:
+    stream_id = re.sub(r"[^a-zA-Z0-9_.-]+", "-", str(value or "").strip()).strip("-._")
+    return stream_id or f"stream-{index + 1}"
+
+
+def _load_streams_config(
+    *,
+    path_value: str | None,
+    json_value: str | None,
+    default_topic: str,
+    default_max_news_per_run: int,
+    default_schedule_cron: str,
+) -> List[NewsStream]:
+    raw_config: Any = None
+    config_source = ""
+    if json_value and json_value.strip():
+        config_source = "STREAMS_CONFIG_JSON"
+        try:
+            raw_config = json.loads(json_value)
+        except json.JSONDecodeError as ex:
+            raise ValueError(f"invalid STREAMS_CONFIG_JSON: {ex}") from ex
+    elif path_value and path_value.strip():
+        config_path = Path(path_value).expanduser()
+        config_source = str(config_path)
+        try:
+            raw_config = json.loads(config_path.read_text(encoding="utf-8"))
+        except OSError as ex:
+            raise ValueError(f"cannot read streams config {config_path}: {ex}") from ex
+        except json.JSONDecodeError as ex:
+            raise ValueError(f"invalid streams config {config_path}: {ex}") from ex
+    else:
+        return []
+
+    if isinstance(raw_config, dict):
+        raw_streams = raw_config.get("streams")
+    else:
+        raw_streams = raw_config
+    if not isinstance(raw_streams, list):
+        raise ValueError(f"{config_source} must contain an array of streams")
+
+    streams: List[NewsStream] = []
+    stream_ids: set[str] = set()
+    for index, raw_stream in enumerate(raw_streams):
+        if not isinstance(raw_stream, dict):
+            raise ValueError(f"stream #{index + 1} must be an object")
+        stream_id = _normalize_stream_id(raw_stream.get("id"), index)
+        if stream_id in stream_ids:
+            raise ValueError(f"duplicate stream id: {stream_id}")
+        stream_ids.add(stream_id)
+
+        rss_urls = _parse_stream_urls(raw_stream.get("rss_urls", raw_stream.get("rss_url")))
+        if not rss_urls:
+            raise ValueError(f"stream {stream_id} must define rss_urls")
+        try:
+            max_news_per_run = max(
+                1,
+                int(raw_stream.get("max_news_per_run", default_max_news_per_run)),
+            )
+        except (TypeError, ValueError) as ex:
+            raise ValueError(f"stream {stream_id} has invalid max_news_per_run") from ex
+
+        schedule_cron = str(raw_stream.get("schedule_cron") or "").strip() or default_schedule_cron
+        target_topic = str(raw_stream.get("target_topic", default_topic) or "").strip()
+        name = str(raw_stream.get("name") or stream_id).strip() or stream_id
+        streams.append(
+            NewsStream(
+                stream_id=stream_id,
+                name=name,
+                rss_urls=rss_urls,
+                target_topic=target_topic,
+                max_news_per_run=max_news_per_run,
+                schedule_cron=schedule_cron,
+                channels=_parse_stream_channels(raw_stream.get("channels")),
+            )
+        )
+    return streams
+
+
 def load_settings() -> Settings:
     load_dotenv()
 
     rss_urls = [url.strip() for url in os.getenv("RSS_URLS", "").split(",") if url.strip()]
     db_path = Path(os.getenv("DATABASE_PATH", "./data/news.db")).expanduser()
+    target_topic = os.getenv("TARGET_TOPIC", "news")
+    schedule_cron = os.getenv("SCHEDULE_CRON", "*/30 * * * *")
+    max_news_per_run = int(os.getenv("MAX_NEWS_PER_RUN", "3"))
+    streams = _load_streams_config(
+        path_value=os.getenv("STREAMS_CONFIG_PATH"),
+        json_value=os.getenv("STREAMS_CONFIG_JSON"),
+        default_topic=target_topic,
+        default_max_news_per_run=max_news_per_run,
+        default_schedule_cron=schedule_cron,
+    )
 
     return Settings(
-        target_topic=os.getenv("TARGET_TOPIC", "news"),
+        target_topic=target_topic,
         target_language=os.getenv("TARGET_LANGUAGE", "ru"),
-        schedule_cron=os.getenv("SCHEDULE_CRON", "*/30 * * * *"),
+        schedule_cron=schedule_cron,
         timezone=os.getenv("TIMEZONE", "Europe/Moscow"),
-        max_news_per_run=int(os.getenv("MAX_NEWS_PER_RUN", "3")),
+        max_news_per_run=max_news_per_run,
         news_max_age_days=max(1, int(os.getenv("NEWS_MAX_AGE_DAYS", "1"))),
         database_path=db_path,
         rss_urls=rss_urls,
@@ -190,4 +330,25 @@ def load_settings() -> Settings:
         enrichment_search_api_key=(os.getenv("ENRICHMENT_SEARCH_API_KEY") or "").strip() or None,
         enrichment_timeout_seconds=max(3, int(os.getenv("ENRICHMENT_TIMEOUT_SECONDS", "15"))),
         enrichment_max_sources=max(1, int(os.getenv("ENRICHMENT_MAX_SOURCES", "3"))),
+        streams=streams,
     )
+
+
+def effective_streams(settings: Settings) -> List[NewsStream]:
+    """Return configured streams, or one legacy stream from the old .env keys."""
+
+    if settings.streams:
+        return settings.streams
+    if not settings.rss_urls:
+        return []
+    return [
+        NewsStream(
+            stream_id="default",
+            name="Default",
+            rss_urls=settings.rss_urls,
+            target_topic=settings.target_topic,
+            max_news_per_run=settings.max_news_per_run,
+            schedule_cron=settings.schedule_cron,
+            channels=[],
+        )
+    ]

@@ -67,8 +67,8 @@ sudo journalctl -u news-bot -f
 
 At minimum:
 
-- Set `RSS_URLS` to one or more comma-separated RSS feed URLs.
-- Set `TARGET_TOPIC` to comma-separated topic keywords, or leave it empty to disable topic filtering.
+- In the regular mode, set `RSS_URLS` to one or more comma-separated RSS feed URLs and configure `TARGET_TOPIC` keywords.
+- For multiple streams, use `STREAMS_CONFIG_PATH` or `STREAMS_CONFIG_JSON` instead (see below).
 - Configure at least one publishing channel:
     - Telegram: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
     - VK: `VK_GROUP_ID` and `VK_ACCESS_TOKEN`.
@@ -83,6 +83,24 @@ Common settings:
 | `MAX_NEWS_PER_RUN` | Maximum successfully processed items per cycle (default: `3`) |
 | `VK_DRAFT_MODE` | Create postponed VK posts instead of publishing immediately (default: `false`) |
 | `DIRECT_PUBLISH_ENABLED` | Publish directly to configured Telegram/VK channels (default: `true`); when disabled, configure Hub delivery and `HUB_CHANNELS` |
+
+### Multiple streams in one instance
+
+Use `STREAMS_CONFIG_PATH` or `STREAMS_CONFIG_JSON` to run multiple independent topic streams in one process. A ready example is available in `config/streams.example.json`.
+
+For a local file-based setup:
+
+```bash
+cp config/streams.example.json config/streams.json
+# edit RSS URLs, keywords, schedules, and channels if needed
+STREAMS_CONFIG_PATH=./config/streams.json python main.py
+```
+
+In Docker set `STREAMS_CONFIG_PATH=/app/config/streams.json` and mount the file into the container. On Railway or another PaaS, you can provide the complete JSON through `STREAMS_CONFIG_JSON`.
+
+Each stream can define its own `rss_urls`, `target_topic` keywords, `schedule_cron`, `max_news_per_run`, and `telegram`/`vk` channels. If `channels` is omitted, global delivery channels are used. Deduplication remains shared across streams, so a story arriving through different RSS searches is not published twice to the same channel. The stream ID is stored in attempt history and sent to Hub.
+
+If neither `STREAMS_CONFIG_PATH` nor `STREAMS_CONFIG_JSON` is set, the legacy `RSS_URLS`/`TARGET_TOPIC` mode remains unchanged.
 
 Advanced settings (LLM, Hub integration, deduplication, etc.) are documented in [docs/config.md](docs/config.md).
 

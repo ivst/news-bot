@@ -1,4 +1,6 @@
+import json
 import os
+import sqlite3
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -42,7 +44,84 @@ def make_news():
     )
 
 
+def make_news_with_link(link: str, title: str) -> NewsItem:
+    item = make_news()
+    item.link = link
+    item.title = title
+    return item
+
+
 class JobTests(unittest.TestCase):
+    def test_multiple_streams_use_separate_inputs_and_keep_shared_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = Path(directory) / "news.db"
+            settings = make_settings(
+                db_path,
+                VK_GROUP_ID="group",
+                VK_ACCESS_TOKEN="token",
+                STREAMS_CONFIG_JSON=json.dumps(
+                    {
+                        "streams": [
+                            {
+                                "id": "ai",
+                                "rss_urls": ["https://feed.example/ai"],
+                                "target_topic": "AI",
+                                "channels": ["telegram"],
+                            },
+                            {
+                                "id": "markets",
+                                "rss_urls": ["https://feed.example/markets"],
+                                "target_topic": "markets",
+                                "channels": ["vk"],
+                            },
+                        ]
+                    }
+                ),
+            )
+            telegram = Mock()
+            telegram.enabled = True
+            vk = Mock()
+            vk.enabled = True
+            hub = Mock()
+            hub.enabled = False
+
+            with patch.object(main, "load_settings", return_value=settings), \
+                patch.object(
+                    main,
+                    "fetch_news",
+                    side_effect=[
+                        [make_news_with_link("https://example.com/ai/1", "AI title")],
+                        [make_news_with_link("https://example.com/markets/1", "Markets title")],
+                    ],
+                ) as fetch_mock, \
+                patch.object(main, "translate_text", return_value="Переведённый текст"), \
+                patch.object(main, "summarize_text", return_value="• Краткое содержание"), \
+                patch.object(main, "TelegramPublisher", return_value=telegram), \
+                patch.object(main, "VKPublisher", return_value=vk), \
+                patch.object(main, "HubClient", return_value=hub), \
+                patch.object(main.time, "sleep"):
+                main.job()
+
+            self.assertEqual(2, fetch_mock.call_count)
+            self.assertEqual("AI", fetch_mock.call_args_list[0].args[1])
+            self.assertEqual("markets", fetch_mock.call_args_list[1].args[1])
+            telegram.publish.assert_called_once()
+            vk.publish.assert_called_once()
+            self.assertTrue(SeenNewsStore(db_path).is_seen("telegram", "https://example.com/ai/1"))
+            self.assertTrue(SeenNewsStore(db_path).is_seen("vk", "https://example.com/markets/1"))
+
+            connection = sqlite3.connect(db_path)
+            try:
+                stream_ids = {
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT stream_id FROM post_attempts WHERE status = 'published'"
+                    ).fetchall()
+                }
+            finally:
+                connection.close()
+            self.assertEqual({"ai", "markets"}, stream_ids)
+
     def test_direct_mode_publishes_and_records_seen_item(self):
         with tempfile.TemporaryDirectory() as directory:
             db_path = Path(directory) / "news.db"

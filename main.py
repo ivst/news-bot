@@ -8,12 +8,13 @@ import time
 import unicodedata
 from difflib import SequenceMatcher
 from datetime import datetime, timezone
+from threading import Lock
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from src.config import load_settings
+from src.config import NewsStream, effective_streams, load_settings
 from src.enrichment import enrich_news_item
 from src.feeds import fetch_news
 from src.hub_client import HubClient
@@ -31,6 +32,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("news-bot")
+_STREAM_RUN_LOCK = Lock()
 
 _EVENT_STOPWORDS = {
     "the",
@@ -344,19 +346,41 @@ def _is_channel_active(active_hours: str | None, now_local: datetime) -> bool:
     return hour >= start or hour < end
 
 
-def job() -> None:
+def job(stream_id: str | None = None) -> None:
     settings = load_settings()
+    streams = effective_streams(settings)
+    if stream_id is not None:
+        streams = [stream for stream in streams if stream.stream_id == stream_id]
+        if not streams:
+            logger.error("Configured stream was not found: %s", stream_id)
+            return
+    if not streams:
+        logger.error("No RSS URLs or streams configured. Nothing to fetch.")
+        return
+    for stream in streams:
+        # Keep processing sequential inside one instance. This prevents two
+        # streams that receive the same item at the same time from passing
+        # the seen/dedup check before either one records the publication.
+        with _STREAM_RUN_LOCK:
+            _run_stream(settings, stream)
+
+
+def _run_stream(settings, stream: NewsStream) -> None:
     duplicate_action = settings.duplicate_action if settings.duplicate_action in {"skip", "draft"} else "skip"
     dedup_min_tokens = max(2, settings.event_tag_dedup_min_tokens)
     now_local = datetime.now(ZoneInfo(settings.timezone))
     tg_active = _is_channel_active(settings.telegram_active_hours, now_local)
     vk_active = _is_channel_active(settings.vk_active_hours, now_local)
 
-    if not settings.rss_urls:
-        logger.error("RSS_URLS is empty. Nothing to fetch.")
+    if not stream.rss_urls:
+        logger.error("Stream %s has no RSS URLs. Nothing to fetch.", stream.stream_id)
         return
 
     store = SeenNewsStore(settings.database_path)
+
+    def record_attempt(**kwargs) -> None:
+        store.record_attempt(stream_id=stream.stream_id, **kwargs)
+
     if settings.dedup_cleanup_enabled:
         deleted_links = store.cleanup_older_than_days(settings.dedup_retention_days)
         deleted_attempts = store.cleanup_attempts_older_than_days(settings.post_attempts_retention_days)
@@ -410,13 +434,13 @@ def job() -> None:
         )
 
     news = fetch_news(
-        settings.rss_urls,
-        settings.target_topic,
-        settings.max_news_per_run * 5,
+        stream.rss_urls,
+        stream.target_topic,
+        stream.max_news_per_run * 5,
         max_age_days=settings.news_max_age_days,
         apply_noise_cleaning=not settings.llm_enabled,
     )
-    logger.info("Fetched %s candidate news items", len(news))
+    logger.info("Stream %s (%s): fetched %s candidate news items", stream.stream_id, stream.name, len(news))
     llm_api_key = settings.llm_api_key if settings.llm_enabled else None
 
     published_items = 0
@@ -436,22 +460,30 @@ def job() -> None:
                 vk_daily_post_limit,
             )
     for item in news:
-        if published_items >= settings.max_news_per_run:
+        if published_items >= stream.max_news_per_run:
             break
 
         channels: list[tuple[str, object]] = []
+        stream_channels = set(stream.channels) if stream.channels else {"telegram", "vk"}
         if settings.direct_publish_enabled:
-            if tg.enabled and tg_active and not store.is_seen("telegram", item.link):
+            if "telegram" in stream_channels and tg.enabled and tg_active and not store.is_seen("telegram", item.link):
                 channels.append(("telegram", tg))
-            if vk.enabled and vk_active and not vk_daily_limit_reached and not store.is_seen("vk", item.link):
+            if (
+                "vk" in stream_channels
+                and vk.enabled
+                and vk_active
+                and not vk_daily_limit_reached
+                and not store.is_seen("vk", item.link)
+            ):
                 channels.append(("vk", vk))
         elif settings.hub_enabled:
             # In Hub-only mode publisher credentials are intentionally not
             # required. HUB_CHANNELS determines which delivery jobs to create.
-            if "telegram" in settings.hub_channels and tg_active and not store.is_seen("telegram", item.link):
+            hub_channels = set(settings.hub_channels) & stream_channels
+            if "telegram" in hub_channels and tg_active and not store.is_seen("telegram", item.link):
                 channels.append(("telegram", tg))
             if (
-                "vk" in settings.hub_channels
+                "vk" in hub_channels
                 and vk_active
                 and not vk_daily_limit_reached
                 and not store.is_seen("vk", item.link)
@@ -465,7 +497,7 @@ def job() -> None:
             published_at = item.published_at.astimezone(timezone.utc).isoformat()
             dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(item.title, "", dedup_min_tokens)
             for channel_name, _ in channels:
-                store.record_attempt(
+                record_attempt(
                     channel=channel_name,
                     link=item.link,
                     title=item.title,
@@ -537,7 +569,7 @@ def job() -> None:
                 logger.warning("Skipped (translation failed for body): %s", item.link)
                 dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(item.title, "", dedup_min_tokens)
                 for channel_name, _ in channels:
-                    store.record_attempt(
+                    record_attempt(
                         channel=channel_name,
                         link=item.link,
                         title=item.title,
@@ -576,7 +608,7 @@ def job() -> None:
             logger.warning("Skipped (translation failed for title): %s", item.link)
             dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(item.title, summary, dedup_min_tokens)
             for channel_name, _ in channels:
-                store.record_attempt(
+                record_attempt(
                     channel=channel_name,
                     link=item.link,
                     title=item.title,
@@ -629,6 +661,11 @@ def job() -> None:
                     image_url=item.image_url,
                     suggested_channels=[channel_name for channel_name, _ in channels],
                     metadata={
+                        "stream": {
+                            "id": stream.stream_id,
+                            "name": stream.name,
+                            "target_topic": stream.target_topic,
+                        },
                         "source": item.source,
                         "enrichment": {
                             "status": enrichment.status,
@@ -697,7 +734,7 @@ def job() -> None:
                     queued = queue_hub_job(channel_name)
                     if queued:
                         store.mark_seen(channel_name, item.link, published_at)
-                        store.record_attempt(
+                        record_attempt(
                             channel=channel_name,
                             link=item.link,
                             title=title,
@@ -739,7 +776,7 @@ def job() -> None:
                                 force_draft=True,
                             )
                             store.mark_seen(channel_name, item.link, published_at)
-                            store.record_attempt(
+                            record_attempt(
                                 channel=channel_name,
                                 link=item.link,
                                 title=title,
@@ -772,7 +809,7 @@ def job() -> None:
                             match_link or "-",
                             event_key or "-",
                         )
-                        store.record_attempt(
+                        record_attempt(
                             channel=channel_name,
                             link=item.link,
                             title=title,
@@ -823,7 +860,7 @@ def job() -> None:
                                 force_draft=True,
                             )
                             store.mark_seen(channel_name, item.link, published_at)
-                            store.record_attempt(
+                            record_attempt(
                                 channel=channel_name,
                                 link=item.link,
                                 title=title,
@@ -858,7 +895,7 @@ def job() -> None:
                             match_link or "-",
                             similarity_reason or "-",
                         )
-                        store.record_attempt(
+                        record_attempt(
                             channel=channel_name,
                             link=item.link,
                             title=title,
@@ -890,7 +927,7 @@ def job() -> None:
                 else:
                     publisher.publish(tg_message, image_url=item.image_url)
                 store.mark_seen(channel_name, item.link, published_at)
-                store.record_attempt(
+                record_attempt(
                     channel=channel_name,
                     link=item.link,
                     title=title,
@@ -921,7 +958,7 @@ def job() -> None:
                     item.link,
                 )
                 vk_daily_limit_reached = True
-                store.record_attempt(
+                record_attempt(
                     channel=channel_name,
                     link=item.link,
                     title=title,
@@ -935,7 +972,7 @@ def job() -> None:
                 )
             except Exception as ex:
                 logger.exception("Publish failed for %s (%s): %s", item.link, channel_name, ex)
-                store.record_attempt(
+                record_attempt(
                     channel=channel_name,
                     link=item.link,
                     title=title,
@@ -951,17 +988,36 @@ def job() -> None:
         if item_has_success:
             published_items += 1
 
-    logger.info("Job finished. Published %s item(s), %s post(s)", published_items, published_posts)
+    logger.info(
+        "Stream %s finished. Published %s item(s), %s post(s)",
+        stream.stream_id,
+        published_items,
+        published_posts,
+    )
 
 
 def main() -> None:
     settings = load_settings()
 
     scheduler = BlockingScheduler(timezone=settings.timezone)
-    trigger = CronTrigger.from_crontab(settings.schedule_cron, timezone=settings.timezone)
-    scheduler.add_job(job, trigger=trigger, id="news-bot-job", replace_existing=True)
+    streams = effective_streams(settings)
+    for stream in streams:
+        trigger = CronTrigger.from_crontab(stream.schedule_cron or settings.schedule_cron, timezone=settings.timezone)
+        scheduler.add_job(
+            job,
+            args=[stream.stream_id],
+            trigger=trigger,
+            id=f"news-bot-stream-{stream.stream_id}",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
 
-    logger.info("Service started. Schedule: %s (%s)", settings.schedule_cron, settings.timezone)
+    logger.info(
+        "Service started. Streams: %s (%s)",
+        ", ".join(f"{stream.stream_id}={stream.schedule_cron}" for stream in streams) or "none",
+        settings.timezone,
+    )
     job()
     scheduler.start()
 

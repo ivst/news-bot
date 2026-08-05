@@ -1,0 +1,26 @@
+{
+  "streams": [
+    {
+      "id": "ai",
+      "name": "Искусственный интеллект",
+      "rss_urls": [
+        "https://news.google.com/rss/search?q=artificial+intelligence&hl=en-US&gl=US&ceid=US:en"
+      ],
+      "target_topic": "AI,artificial intelligence,нейросети,машинное обучение",
+      "schedule_cron": "*/30 * * * *",
+      "max_news_per_run": 3,
+      "channels": ["telegram", "vk"]
+    },
+    {
+      "id": "finance",
+      "name": "Финансы и рынки",
+      "rss_urls": [
+        "https://news.google.com/rss/search?q=finance+markets&hl=en-US&gl=US&ceid=US:en"
+      ],
+      "target_topic": "finance,markets,stocks,финансы,рынки,акции",
+      "schedule_cron": "10,40 * * * *",
+      "max_news_per_run": 2,
+      "channels": ["vk"]
+    }
+  ]
+}
