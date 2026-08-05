@@ -104,7 +104,7 @@ In Hub mode the bot sends the source text, translation, enrichment status, sourc
 
 ## Source enrichment and deduplication
 
-Source enrichment is disabled by default for compatibility with existing deployments. Enable it explicitly with `ENRICHMENT_ENABLED=true`. The bot first loads the original article from the RSS link. With `ENRICHMENT_MODE=source_then_search`, it uses the configured Search API only when the original page is unavailable. Search results are fetched as real source pages; search snippets are not used as article text.
+Source enrichment is disabled by default for compatibility with existing deployments. Enable it explicitly with `ENRICHMENT_ENABLED=true`. Use `ENRICHMENT_MODE=source_only` to load only the original article without a Search API. With `ENRICHMENT_MODE=source_then_search`, the configured Search API is used only when the original page is unavailable. Search results are fetched as real source pages; search snippets are not used as article text.
 
 To publish an AI-edited post based on the enriched article, enable `LLM_REWRITE_ENABLED=true` together with `LLM_ENABLED=true`. The text is generated from `LLM_REWRITE_PROMPT`; without this setting the bot publishes the existing short summary.
 

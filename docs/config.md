@@ -97,7 +97,7 @@ Similarity dedup:
 ## Source enrichment
 
 - `ENRICHMENT_ENABLED` (default: `false`) - load the original article before translation. Enable explicitly for existing deployments.
-- `ENRICHMENT_MODE` (default: `source_then_search`) - `disabled`, `source_only`, `source_then_search`, or `search_only`.
+- `ENRICHMENT_MODE` (default: `source_then_search`) - `disabled` (do not load sources), `source_only` (load only the RSS source page, no Search API), `source_then_search` (use Search API only when the source is unavailable), or `search_only`.
 - `ENRICHMENT_SEARCH_PROVIDER` (default: `brave`) - currently supported provider.
 - `ENRICHMENT_SEARCH_ENDPOINT` (default: Brave Web Search API endpoint).
 - `ENRICHMENT_SEARCH_API_KEY` (default: empty) - provider key. Without it, RSS content is retained when the source is unavailable.
