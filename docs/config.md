@@ -44,12 +44,12 @@ For a minimal startup config, see `.env.example` and README.
 - `LLM_API_KEY` (default: empty) - API key for provider.
 - `LLM_MODEL` (default: `gpt-4.1-mini`) - model name.
 - `LLM_BASE_URL` (default: `https://api.openai.com/v1`) - API base URL.
-- `LLM_TRANSLATION_MAX_TOKENS` (default: `2000`) - completion-token limit for each LLM translation.
+- `LLM_TRANSLATION_MAX_TOKENS` (default: `4000`) - completion-token limit for each LLM translation. Truncated responses are rejected and use fallback handling.
 - `LLM_SUMMARY_MAX_TOKENS` (default: `2000`) - completion-token limit for each LLM summary.
 - `SUMMARY_MAX_LINES` (default: `3`) - number of summary lines.
 - `LLM_SUMMARY_PROMPT` - summary prompt template with `{target_language}` and `{summary_max_lines}` placeholders.
 - `LLM_REWRITE_ENABLED` (default: `false`) - use an LLM-rewritten post instead of the short summary for publication. Requires `LLM_ENABLED=true`.
-- `LLM_REWRITE_MAX_TOKENS` (default: `2500`) - completion-token limit for rewriting.
+- `LLM_REWRITE_MAX_TOKENS` (default: `4000`) - completion-token limit for rewriting. Truncated responses are rejected instead of being published.
 - `LLM_REWRITE_MAX_CHARS` (default: `3000`) - maximum rewritten post length before channel formatting.
 - `LLM_REWRITE_PROMPT` - rewrite prompt template with `{target_language}` and `{rewrite_max_chars}` placeholders.
 

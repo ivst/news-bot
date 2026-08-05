@@ -103,6 +103,19 @@ def chat_completion(
 
     message = choice0.get("message") or {}
     content = message.get("content")
+    if finish_reason == "length":
+        elapsed_ms = int((time.monotonic() - started_at) * 1000)
+        logger.warning(
+            "LLM response was truncated by max_tokens endpoint=%s model=%s status=%s elapsed_ms=%s "
+            "usage_prompt_tokens=%s usage_completion_tokens=%s",
+            endpoint,
+            model,
+            response.status_code,
+            elapsed_ms,
+            usage_prompt_tokens,
+            usage_completion_tokens,
+        )
+        return None
     if isinstance(content, str):
         content = content.strip()
         elapsed_ms = int((time.monotonic() - started_at) * 1000)

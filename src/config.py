@@ -128,7 +128,7 @@ def load_settings() -> Settings:
             "Return exactly {summary_max_lines} lines, each line starts with '• '. "
             "Keep it factual and concise, no hype, no markdown, no date/source/link repetition.",
         ),
-        llm_translation_max_tokens=max(1, int(os.getenv("LLM_TRANSLATION_MAX_TOKENS", "2000"))),
+        llm_translation_max_tokens=max(1, int(os.getenv("LLM_TRANSLATION_MAX_TOKENS", "4000"))),
         llm_summary_max_tokens=max(1, int(os.getenv("LLM_SUMMARY_MAX_TOKENS", "2000"))),
         summary_max_lines=max(1, int(os.getenv("SUMMARY_MAX_LINES", "3"))),
         short_links_enabled=_to_bool(os.getenv("SHORT_LINKS_ENABLED"), default=False),
@@ -155,7 +155,7 @@ def load_settings() -> Settings:
             "do not add a title, source, link, or editorial commentary. Keep it concise and within "
             "{rewrite_max_chars} characters. Return only the rewritten post.",
         ),
-        llm_rewrite_max_tokens=max(1, int(os.getenv("LLM_REWRITE_MAX_TOKENS", "2500"))),
+        llm_rewrite_max_tokens=max(1, int(os.getenv("LLM_REWRITE_MAX_TOKENS", "4000"))),
         llm_rewrite_max_chars=max(200, int(os.getenv("LLM_REWRITE_MAX_CHARS", "3000"))),
         similar_dedup_threshold=min(1.0, max(0.0, float(os.getenv("SIMILAR_DEDUP_THRESHOLD", "0.90")))),
         similar_dedup_token_threshold=min(
