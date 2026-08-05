@@ -48,6 +48,10 @@ For a minimal startup config, see `.env.example` and README.
 - `LLM_SUMMARY_MAX_TOKENS` (default: `2000`) - completion-token limit for each LLM summary.
 - `SUMMARY_MAX_LINES` (default: `3`) - number of summary lines.
 - `LLM_SUMMARY_PROMPT` - summary prompt template with `{target_language}` and `{summary_max_lines}` placeholders.
+- `LLM_REWRITE_ENABLED` (default: `false`) - use an LLM-rewritten post instead of the short summary for publication. Requires `LLM_ENABLED=true`.
+- `LLM_REWRITE_MAX_TOKENS` (default: `2500`) - completion-token limit for rewriting.
+- `LLM_REWRITE_MAX_CHARS` (default: `3000`) - maximum rewritten post length before channel formatting.
+- `LLM_REWRITE_PROMPT` - rewrite prompt template with `{target_language}` and `{rewrite_max_chars}` placeholders.
 
 Behavior:
 - If `LLM_ENABLED=false`, no LLM calls are made.

@@ -104,6 +104,37 @@ class JobTests(unittest.TestCase):
             self.assertEqual("disabled", hub.ingest_item.call_args.kwargs["enrichment_status"])
             self.assertTrue(SeenNewsStore(db_path).is_seen("telegram", "https://example.com/news/1"))
 
+    def test_llm_rewrite_is_used_for_automatic_publication(self):
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = Path(directory) / "news.db"
+            settings = make_settings(
+                db_path,
+                LLM_ENABLED="true",
+                LLM_API_KEY="key",
+                LLM_REWRITE_ENABLED="true",
+            )
+            telegram = Mock()
+            telegram.enabled = True
+            vk = Mock()
+            vk.enabled = False
+            hub = Mock()
+            hub.enabled = False
+
+            with patch.object(main, "load_settings", return_value=settings), \
+                patch.object(main, "fetch_news", return_value=[make_news()]), \
+                patch.object(main, "translate_text", return_value="Переведённый текст"), \
+                patch.object(main, "summarize_text", return_value="• Старое краткое резюме"), \
+                patch.object(main, "rewrite_news", return_value="Редакторский пост из нейросети"), \
+                patch.object(main, "TelegramPublisher", return_value=telegram), \
+                patch.object(main, "VKPublisher", return_value=vk), \
+                patch.object(main, "HubClient", return_value=hub), \
+                patch.object(main.time, "sleep"):
+                main.job()
+
+            published_message = telegram.publish.call_args.args[0]
+            self.assertIn("Редакторский пост из нейросети", published_message)
+            self.assertNotIn("Старое краткое резюме", published_message)
+
 
 if __name__ == "__main__":
     unittest.main()

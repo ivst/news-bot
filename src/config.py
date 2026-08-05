@@ -35,6 +35,10 @@ class Settings:
     llm_model: str
     llm_base_url: str
     llm_summary_prompt: str
+    llm_rewrite_enabled: bool
+    llm_rewrite_prompt: str
+    llm_rewrite_max_tokens: int
+    llm_rewrite_max_chars: int
     llm_translation_max_tokens: int
     llm_summary_max_tokens: int
     summary_max_lines: int
@@ -143,6 +147,16 @@ def load_settings() -> Settings:
             1,
             int(os.getenv("DEDUP_RECENT_PUBLISHED_LIMIT", os.getenv("SIMILAR_DEDUP_WINDOW", "15"))),
         ),
+        llm_rewrite_enabled=_to_bool(os.getenv("LLM_REWRITE_ENABLED"), default=False),
+        llm_rewrite_prompt=os.getenv(
+            "LLM_REWRITE_PROMPT",
+            "You are a factual news editor. Rewrite the material in '{target_language}' "
+            "as a ready-to-publish news post. Use only facts from the material, do not invent details, "
+            "do not add a title, source, link, or editorial commentary. Keep it concise and within "
+            "{rewrite_max_chars} characters. Return only the rewritten post.",
+        ),
+        llm_rewrite_max_tokens=max(1, int(os.getenv("LLM_REWRITE_MAX_TOKENS", "2500"))),
+        llm_rewrite_max_chars=max(200, int(os.getenv("LLM_REWRITE_MAX_CHARS", "3000"))),
         similar_dedup_threshold=min(1.0, max(0.0, float(os.getenv("SIMILAR_DEDUP_THRESHOLD", "0.90")))),
         similar_dedup_token_threshold=min(
             1.0,

@@ -24,6 +24,7 @@ from src.storage import SeenNewsStore
 from src.summarizer import summarize_text
 from src.text_cleaner import strip_ui_noise
 from src.translator import translate_text
+from src.rewriter import rewrite_news
 
 logging.basicConfig(
     level=logging.INFO,
@@ -537,6 +538,7 @@ def job() -> None:
             llm_max_tokens=settings.llm_summary_max_tokens,
         )
         summary = strip_ui_noise(summary)
+        publication_body = summary
         title = translate_text(
             item.title,
             settings.target_language,
@@ -564,17 +566,31 @@ def job() -> None:
                 )
             continue
         title = _normalize_title(strip_ui_noise(title))
+        if settings.llm_rewrite_enabled and llm_api_key:
+            rewritten = rewrite_news(
+                f"{title}\n\n{translated}",
+                target_language=settings.target_language,
+                api_key=llm_api_key,
+                model=settings.llm_model,
+                base_url=settings.llm_base_url,
+                prompt_template=settings.llm_rewrite_prompt,
+                max_tokens=settings.llm_rewrite_max_tokens,
+                max_chars=settings.llm_rewrite_max_chars,
+            )
+            if rewritten:
+                publication_body = rewritten
+                logger.info("LLM rewrite selected for publication link=%s chars=%s", item.link, len(rewritten))
         publish_link = item.link
         if settings.short_links_enabled:
             publish_link = shorten_url(item.link, settings.shortener_provider)
         summary = _normalize_summary(summary, settings.summary_max_lines)
-        dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(title, summary, dedup_min_tokens)
+        dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(title, publication_body, dedup_min_tokens)
         tg_message = strip_ui_noise(
-            build_telegram_message(title, summary, item.link, include_source=settings.telegram_show_source)
+            build_telegram_message(title, publication_body, item.link, include_source=settings.telegram_show_source)
         )
-        vk_message = strip_ui_noise(build_vk_message(title, summary, include_source=settings.vk_show_source))
-        hub_tg_message = strip_ui_noise(build_telegram_message(title, summary, item.link, include_source=False))
-        hub_vk_message = strip_ui_noise(build_vk_message(title, summary, include_source=False))
+        vk_message = strip_ui_noise(build_vk_message(title, publication_body, include_source=settings.vk_show_source))
+        hub_tg_message = strip_ui_noise(build_telegram_message(title, publication_body, item.link, include_source=False))
+        hub_vk_message = strip_ui_noise(build_vk_message(title, publication_body, include_source=False))
         vk_source_link = publish_link if settings.vk_show_source else None
         text_norm = _text_norm_for_similarity(title, summary)
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
@@ -608,6 +624,10 @@ def job() -> None:
                             "status": enrichment.status,
                             "query": enrichment.query,
                             "documents": enrichment.documents,
+                        },
+                        "publication": {
+                            "mode": "llm_rewrite" if publication_body != summary else "summary",
+                            "body": publication_body,
                         },
                         "dedup": {
                             "event_key": dedup_key,
