@@ -500,45 +500,67 @@ def job() -> None:
             enrichment.status,
             len(enrichment.documents),
         )
-        translated = translate_text(
-            source_text,
-            settings.target_language,
-            llm_api_key=llm_api_key,
-            llm_model=settings.llm_model,
-            llm_base_url=settings.llm_base_url,
-            use_llm_translation=settings.llm_enabled,
-            llm_max_tokens=settings.llm_translation_max_tokens,
-        )
-        if not translated:
-            logger.warning("Skipped (translation failed for body): %s", item.link)
-            dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(item.title, "", dedup_min_tokens)
-            for channel_name, _ in channels:
-                store.record_attempt(
-                    channel=channel_name,
-                    link=item.link,
-                    title=item.title,
-                    summary="",
-                    text_norm="",
-                    status="rejected_translation_failed",
-                    reason="body_translation_failed",
-                    event_key=dedup_key,
-                    event_tokens=dedup_tokens,
-                    dedup_version=dedup_version,
-                )
-            continue
-        translated = strip_ui_noise(translated)
-        summary = summarize_text(
-            translated,
-            target_language=settings.target_language,
-            llm_api_key=llm_api_key,
-            llm_model=settings.llm_model,
-            llm_base_url=settings.llm_base_url,
-            prompt_template=settings.llm_summary_prompt,
-            summary_max_lines=settings.summary_max_lines,
-            llm_max_tokens=settings.llm_summary_max_tokens,
-        )
-        summary = strip_ui_noise(summary)
-        publication_body = summary
+        rewritten = None
+        if settings.llm_rewrite_enabled and llm_api_key:
+            # Rewrite directly from the enriched source. This avoids first
+            # generating a potentially very long intermediate translation,
+            # which can exhaust the model output limit before rewrite starts.
+            rewritten = rewrite_news(
+                f"{item.title}\n\n{source_text}",
+                target_language=settings.target_language,
+                api_key=llm_api_key,
+                model=settings.llm_model,
+                base_url=settings.llm_base_url,
+                prompt_template=settings.llm_rewrite_prompt,
+                max_tokens=settings.llm_rewrite_max_tokens,
+                max_chars=settings.llm_rewrite_max_chars,
+            )
+
+        if rewritten:
+            translated = rewritten
+            summary = rewritten
+            publication_body = rewritten
+            logger.info("LLM rewrite selected for publication link=%s chars=%s", item.link, len(rewritten))
+        else:
+            translated = translate_text(
+                source_text,
+                settings.target_language,
+                llm_api_key=llm_api_key,
+                llm_model=settings.llm_model,
+                llm_base_url=settings.llm_base_url,
+                use_llm_translation=settings.llm_enabled,
+                llm_max_tokens=settings.llm_translation_max_tokens,
+            )
+            if not translated:
+                logger.warning("Skipped (translation failed for body): %s", item.link)
+                dedup_key, dedup_tokens, dedup_version = _dedup_snapshot(item.title, "", dedup_min_tokens)
+                for channel_name, _ in channels:
+                    store.record_attempt(
+                        channel=channel_name,
+                        link=item.link,
+                        title=item.title,
+                        summary="",
+                        text_norm="",
+                        status="rejected_translation_failed",
+                        reason="body_translation_failed",
+                        event_key=dedup_key,
+                        event_tokens=dedup_tokens,
+                        dedup_version=dedup_version,
+                    )
+                continue
+            translated = strip_ui_noise(translated)
+            summary = summarize_text(
+                translated,
+                target_language=settings.target_language,
+                llm_api_key=llm_api_key,
+                llm_model=settings.llm_model,
+                llm_base_url=settings.llm_base_url,
+                prompt_template=settings.llm_summary_prompt,
+                summary_max_lines=settings.summary_max_lines,
+                llm_max_tokens=settings.llm_summary_max_tokens,
+            )
+            summary = strip_ui_noise(summary)
+            publication_body = summary
         title = translate_text(
             item.title,
             settings.target_language,
@@ -566,20 +588,6 @@ def job() -> None:
                 )
             continue
         title = _normalize_title(strip_ui_noise(title))
-        if settings.llm_rewrite_enabled and llm_api_key:
-            rewritten = rewrite_news(
-                f"{title}\n\n{translated}",
-                target_language=settings.target_language,
-                api_key=llm_api_key,
-                model=settings.llm_model,
-                base_url=settings.llm_base_url,
-                prompt_template=settings.llm_rewrite_prompt,
-                max_tokens=settings.llm_rewrite_max_tokens,
-                max_chars=settings.llm_rewrite_max_chars,
-            )
-            if rewritten:
-                publication_body = rewritten
-                logger.info("LLM rewrite selected for publication link=%s chars=%s", item.link, len(rewritten))
         publish_link = item.link
         if settings.short_links_enabled:
             publish_link = shorten_url(item.link, settings.shortener_provider)
@@ -592,7 +600,7 @@ def job() -> None:
         hub_tg_message = strip_ui_noise(build_telegram_message(title, publication_body, item.link, include_source=False))
         hub_vk_message = strip_ui_noise(build_vk_message(title, publication_body, include_source=False))
         vk_source_link = publish_link if settings.vk_show_source else None
-        text_norm = _text_norm_for_similarity(title, summary)
+        text_norm = _text_norm_for_similarity(title, publication_body)
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
         hub_item_id: int | None = None
         hub_item_ingest_failed = False
