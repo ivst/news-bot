@@ -88,6 +88,34 @@ Advanced settings (LLM, Hub integration, deduplication, etc.) are documented in 
 
 LLM access is optional. Without it, the service uses Google Translate as a fallback and generates simple summaries locally.
 
+## Processing modes
+
+By default, `news-bot` works standalone and publishes directly to Telegram/VK. To use Hub as the storage, moderation, deduplication, and publication service, set:
+
+```env
+HUB_ENABLED=true
+DIRECT_PUBLISH_ENABLED=false
+HUB_CREATE_JOBS=true
+HUB_BASE_URL=https://your-hub.example
+HUB_API_KEY=your-api-key
+```
+
+In Hub mode the bot sends the source text, translation, enrichment status, source provenance, and deduplication metadata. Hub performs the final duplicate check before creating a publication job.
+
+## Source enrichment and deduplication
+
+Source enrichment is disabled by default for compatibility with existing deployments. Enable it explicitly with `ENRICHMENT_ENABLED=true`. The bot first loads the original article from the RSS link. With `ENRICHMENT_MODE=source_then_search`, it uses the configured Search API only when the original page is unavailable. Search results are fetched as real source pages; search snippets are not used as article text.
+
+The standalone deduplication checks the configured number of recent published posts using normalized links, titles, text similarity, character n-grams, and event tokens. Configure the window with `DEDUP_RECENT_PUBLISHED_LIMIT` (the legacy `SIMILAR_DEDUP_WINDOW` remains supported).
+
+## Tests
+
+Run the bot test suite with:
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py'
+```
+
 ---
 
 ## Production (systemd)
