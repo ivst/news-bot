@@ -35,7 +35,7 @@ class HubClientTests(unittest.TestCase):
             translated_body="Текст",
             language="ru",
             image_url=None,
-            suggested_channels=["telegram", "invalid"],
+            suggested_channels=["telegram", "bitrix24", "invalid"],
             metadata={"dedup": {"event_key": "event"}},
             source_documents=[{"url": "https://example.com/news", "kind": "source"}],
             enrichment_status="source_fetched",
@@ -48,7 +48,7 @@ class HubClientTests(unittest.TestCase):
         self.assertEqual("source_fetched", payload["enrichment_status"])
         self.assertEqual("automatic", payload["publication_mode"])
         self.assertEqual("event", payload["metadata"]["dedup"]["event_key"])
-        self.assertEqual(["telegram"], payload["suggested_channels"])
+        self.assertEqual(["telegram", "bitrix24"], payload["suggested_channels"])
 
     @patch("src.hub_client.requests.post", side_effect=requests.Timeout("timeout"))
     def test_http_failure_is_propagated(self, _post):

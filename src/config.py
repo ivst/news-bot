@@ -47,6 +47,12 @@ class Settings:
     vk_draft_mode: bool
     vk_draft_delay_minutes: int
     vk_daily_post_limit: int
+    bitrix24_webhook_url: str | None
+    bitrix24_destination: List[str]
+    bitrix24_tags: str
+    bitrix24_show_source: bool
+    bitrix24_image_upload_enabled: bool
+    bitrix24_timeout_seconds: int
     llm_enabled: bool
     llm_api_key: str | None
     llm_model: str
@@ -100,7 +106,7 @@ def _to_bool(value: str | None, default: bool = False) -> bool:
 
 
 def _parse_channels(value: str | None) -> List[str]:
-    allowed = {"telegram", "vk"}
+    allowed = {"telegram", "vk", "bitrix24"}
     channels: List[str] = []
     for channel in (value or "telegram,vk").split(","):
         normalized = channel.strip().lower()
@@ -119,7 +125,7 @@ def _parse_stream_channels(value: Any) -> List[str]:
     else:
         raise ValueError("stream channels must be a comma-separated string or an array")
 
-    allowed = {"telegram", "vk"}
+    allowed = {"telegram", "vk", "bitrix24"}
     channels: List[str] = []
     unknown: List[str] = []
     for channel in raw_channels:
@@ -265,6 +271,16 @@ def load_settings() -> Settings:
         vk_draft_mode=_to_bool(os.getenv("VK_DRAFT_MODE"), default=False),
         vk_draft_delay_minutes=max(10, int(os.getenv("VK_DRAFT_DELAY_MINUTES", "43200"))),
         vk_daily_post_limit=max(0, int(os.getenv("VK_DAILY_POST_LIMIT", "0"))),
+        bitrix24_webhook_url=(os.getenv("BITRIX24_WEBHOOK_URL") or "").strip() or None,
+        bitrix24_destination=[
+            destination.strip()
+            for destination in os.getenv("BITRIX24_DESTINATION", "UA").split(",")
+            if destination.strip()
+        ],
+        bitrix24_tags=(os.getenv("BITRIX24_TAGS") or "").strip(),
+        bitrix24_show_source=_to_bool(os.getenv("BITRIX24_SHOW_SOURCE"), default=True),
+        bitrix24_image_upload_enabled=_to_bool(os.getenv("BITRIX24_IMAGE_UPLOAD_ENABLED"), default=True),
+        bitrix24_timeout_seconds=max(3, int(os.getenv("BITRIX24_TIMEOUT_SECONDS", "30"))),
         llm_enabled=_to_bool(os.getenv("LLM_ENABLED"), default=False),
         llm_api_key=os.getenv("LLM_API_KEY") or None,
         llm_model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),

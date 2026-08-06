@@ -52,6 +52,51 @@ def make_news_with_link(link: str, title: str) -> NewsItem:
 
 
 class JobTests(unittest.TestCase):
+    def test_direct_bitrix24_stream_publishes_to_news_feed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = Path(directory) / "news.db"
+            settings = make_settings(
+                db_path,
+                TELEGRAM_BOT_TOKEN="",
+                TELEGRAM_CHAT_ID="",
+                BITRIX24_WEBHOOK_URL="https://portal.bitrix24.example/webhook",
+                STREAMS_CONFIG_JSON=json.dumps(
+                    {
+                        "streams": [
+                            {
+                                "id": "bitrix",
+                                "rss_urls": ["https://feed.example/bitrix"],
+                                "target_topic": "news",
+                                "channels": ["bitrix24"],
+                            }
+                        ]
+                    }
+                ),
+            )
+            bitrix24 = Mock()
+            bitrix24.enabled = True
+            telegram = Mock()
+            telegram.enabled = False
+            vk = Mock()
+            vk.enabled = False
+            hub = Mock()
+            hub.enabled = False
+
+            with patch.object(main, "load_settings", return_value=settings), \
+                patch.object(main, "fetch_news", return_value=[make_news()]), \
+                patch.object(main, "translate_text", side_effect=["Переведённый текст", "Переведённый заголовок"]), \
+                patch.object(main, "summarize_text", return_value="• Краткое содержание"), \
+                patch.object(main, "TelegramPublisher", return_value=telegram), \
+                patch.object(main, "VKPublisher", return_value=vk), \
+                patch.object(main, "Bitrix24Publisher", return_value=bitrix24), \
+                patch.object(main, "HubClient", return_value=hub), \
+                patch.object(main.time, "sleep"):
+                main.job()
+
+            bitrix24.publish.assert_called_once()
+            self.assertEqual("Переведённый заголовок", bitrix24.publish.call_args.args[0])
+            self.assertIn("Краткое содержание", bitrix24.publish.call_args.args[1])
+
     def test_multiple_streams_use_separate_inputs_and_keep_shared_history(self):
         with tempfile.TemporaryDirectory() as directory:
             db_path = Path(directory) / "news.db"

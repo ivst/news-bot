@@ -100,6 +100,8 @@ In Docker set `STREAMS_CONFIG_PATH=/app/config/streams.json` and mount the file 
 
 Each stream can define its own `rss_urls`, `target_topic` keywords, `schedule_cron`, `max_news_per_run`, and `telegram`/`vk` channels. If `channels` is omitted, global delivery channels are used. Deduplication remains shared across streams, so a story arriving through different RSS searches is not published twice to the same channel. The stream ID is stored in attempt history and sent to Hub.
 
+For direct Bitrix24 News Feed publication, add `bitrix24` to a stream's `channels` and configure `BITRIX24_WEBHOOK_URL`. The webhook must have the `log` permission; the default `BITRIX24_DESTINATION=UA` publishes to all authorized portal users. When an image is available, the bot attaches it to the post and enables source-link preview. In Hub mode, add `bitrix24` to `HUB_CHANNELS` and configure the webhook in `news-hub` instead.
+
 If neither `STREAMS_CONFIG_PATH` nor `STREAMS_CONFIG_JSON` is set, the legacy `RSS_URLS`/`TARGET_TOPIC` mode remains unchanged.
 
 Advanced settings (LLM, Hub integration, deduplication, etc.) are documented in [docs/config.md](docs/config.md).

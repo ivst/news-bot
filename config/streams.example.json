@@ -9,7 +9,7 @@
       "target_topic": "AI,artificial intelligence,нейросети,машинное обучение",
       "schedule_cron": "*/30 * * * *",
       "max_news_per_run": 3,
-      "channels": ["telegram", "vk"]
+      "channels": ["telegram", "vk", "bitrix24"]
     },
     {
       "id": "finance",

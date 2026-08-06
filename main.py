@@ -19,6 +19,7 @@ from src.enrichment import enrich_news_item
 from src.feeds import fetch_news
 from src.hub_client import HubClient
 from src.link_shortener import shorten_url
+from src.publishers.bitrix24 import Bitrix24Publisher
 from src.publishers.telegram import TelegramPublisher
 from src.publishers.vk import VKDailyPostLimitError, VKPublisher
 from src.storage import SeenNewsStore
@@ -408,6 +409,14 @@ def _run_stream(settings, stream: NewsStream) -> None:
         draft_mode=settings.vk_draft_mode,
         draft_delay_minutes=settings.vk_draft_delay_minutes,
     )
+    bitrix24 = Bitrix24Publisher(
+        settings.bitrix24_webhook_url,
+        destination=settings.bitrix24_destination,
+        tags=settings.bitrix24_tags,
+        show_source=settings.bitrix24_show_source,
+        image_upload_enabled=settings.bitrix24_image_upload_enabled,
+        timeout_seconds=settings.bitrix24_timeout_seconds,
+    )
     hub = HubClient(
         base_url=settings.hub_base_url,
         api_key=settings.hub_api_key,
@@ -464,7 +473,7 @@ def _run_stream(settings, stream: NewsStream) -> None:
             break
 
         channels: list[tuple[str, object]] = []
-        stream_channels = set(stream.channels) if stream.channels else {"telegram", "vk"}
+        stream_channels = set(stream.channels) if stream.channels else {"telegram", "vk", "bitrix24"}
         if settings.direct_publish_enabled:
             if "telegram" in stream_channels and tg.enabled and tg_active and not store.is_seen("telegram", item.link):
                 channels.append(("telegram", tg))
@@ -476,6 +485,8 @@ def _run_stream(settings, stream: NewsStream) -> None:
                 and not store.is_seen("vk", item.link)
             ):
                 channels.append(("vk", vk))
+            if "bitrix24" in stream_channels and bitrix24.enabled and not store.is_seen("bitrix24", item.link):
+                channels.append(("bitrix24", bitrix24))
         elif settings.hub_enabled:
             # In Hub-only mode publisher credentials are intentionally not
             # required. HUB_CHANNELS determines which delivery jobs to create.
@@ -489,6 +500,8 @@ def _run_stream(settings, stream: NewsStream) -> None:
                 and not store.is_seen("vk", item.link)
             ):
                 channels.append(("vk", vk))
+            if "bitrix24" in hub_channels and not store.is_seen("bitrix24", item.link):
+                channels.append(("bitrix24", bitrix24))
         if not channels:
             continue
 
@@ -633,7 +646,9 @@ def _run_stream(settings, stream: NewsStream) -> None:
         vk_message = strip_ui_noise(build_vk_message(title, publication_body, include_source=settings.vk_show_source))
         hub_tg_message = strip_ui_noise(build_telegram_message(title, publication_body, item.link, include_source=False))
         hub_vk_message = strip_ui_noise(build_vk_message(title, publication_body, include_source=False))
+        hub_bitrix24_message = strip_ui_noise(publication_body)
         vk_source_link = publish_link if settings.vk_show_source else None
+        bitrix24_source_link = publish_link if settings.bitrix24_show_source else None
         text_norm = _text_norm_for_similarity(title, publication_body)
         published_at = item.published_at.astimezone(timezone.utc).isoformat()
         hub_item_id: int | None = None
@@ -707,8 +722,23 @@ def _run_stream(settings, stream: NewsStream) -> None:
                     "source_link": item.link,
                     "short_link": publish_link,
                     "image_url": item.image_url,
-                    "message": hub_vk_message if channel_name == "vk" else hub_tg_message,
-                    "show_source": settings.vk_show_source if channel_name == "vk" else settings.telegram_show_source,
+                    "message": (
+                        hub_vk_message
+                        if channel_name == "vk"
+                        else hub_bitrix24_message
+                        if channel_name == "bitrix24"
+                        else hub_tg_message
+                    ),
+                    "show_source": (
+                        settings.vk_show_source
+                        if channel_name == "vk"
+                        else settings.bitrix24_show_source
+                        if channel_name == "bitrix24"
+                        else settings.telegram_show_source
+                    ),
+                    "title": title,
+                    "tags": settings.bitrix24_tags if channel_name == "bitrix24" else "",
+                    "bitrix24_source_link": bitrix24_source_link if channel_name == "bitrix24" else "",
                     "is_duplicate": is_duplicate,
                     "duplicate_reason": duplicate_reason if is_duplicate else "",
                     "dedup": {
@@ -922,6 +952,13 @@ def _run_stream(settings, stream: NewsStream) -> None:
                         vk_message,
                         attachment_link=vk_source_link,
                         source_link=vk_source_link,
+                        image_url=item.image_url,
+                    )
+                elif channel_name == "bitrix24":
+                    publisher.publish(
+                        title,
+                        publication_body,
+                        source_link=bitrix24_source_link,
                         image_url=item.image_url,
                     )
                 else:

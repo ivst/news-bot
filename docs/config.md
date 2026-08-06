@@ -32,7 +32,7 @@ Stream object fields:
 - `target_topic` (optional) - comma-separated topic terms; defaults to global `TARGET_TOPIC`.
 - `schedule_cron` (optional) - stream schedule; defaults to global `SCHEDULE_CRON`.
 - `max_news_per_run` (optional) - stream limit; defaults to global `MAX_NEWS_PER_RUN`.
-- `channels` (optional) - array or comma-separated string containing `telegram` and/or `vk`; omitted means global channels.
+- `channels` (optional) - array or comma-separated string containing `telegram`, `vk`, and/or `bitrix24`; omitted means global channels.
 
 Deduplication is intentionally shared between streams per channel. The stream ID is stored in `post_attempts.stream_id` and included in Hub item metadata.
 
@@ -55,6 +55,15 @@ Deduplication is intentionally shared between streams per channel. The stream ID
 - `VK_DRAFT_MODE` (default: `false`) - publish as postponed draft posts.
 - `VK_DRAFT_DELAY_MINUTES` (default: `43200`) - draft delay in minutes.
 - `VK_DAILY_POST_LIMIT` (default: `0`) - per-day VK cap (`0` means unlimited).
+
+## Bitrix24
+
+- `BITRIX24_WEBHOOK_URL` (default: empty) - full incoming webhook URL with the `log` permission.
+- `BITRIX24_DESTINATION` (default: `UA`) - comma-separated News Feed recipients, for example `UA` for all authorized users.
+- `BITRIX24_TAGS` (default: empty) - optional comma-separated post tags.
+- `BITRIX24_SHOW_SOURCE` (default: `true`) - append the source link to the post.
+- `BITRIX24_IMAGE_UPLOAD_ENABLED` (default: `true`) - download and attach the RSS image when available.
+- `BITRIX24_TIMEOUT_SECONDS` (default: `30`) - Bitrix24 API and image download timeout.
 
 ## LLM (OpenAI-Compatible API)
 
@@ -106,7 +115,7 @@ Similarity dedup:
 - `HUB_ENABLED` (default: `false`) - enable external `news-hub` delivery.
 - `HUB_BASE_URL` (default: empty) - hub API base URL.
 - `HUB_API_KEY` (default: empty) - hub API key.
-- `HUB_CHANNELS` (default: `telegram,vk`) - comma-separated Hub delivery channels used when direct publishing is disabled.
+- `HUB_CHANNELS` (default: `telegram,vk`) - comma-separated Hub delivery channels used when direct publishing is disabled (`telegram`, `vk`, `bitrix24`).
 - `HUB_TIMEOUT_SECONDS` (default: `15`) - hub request timeout.
 - `HUB_CREATE_JOBS` (default: `true`) - create per-channel jobs in hub.
 - `HUB_SEND_DUPLICATES` (default: `false`) - send duplicate items/jobs to hub.

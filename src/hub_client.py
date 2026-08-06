@@ -68,7 +68,7 @@ class HubClient:
             "translated_body": translated_body,
             "language": language,
             "image_url": image_url,
-            "suggested_channels": [c for c in suggested_channels if c in {"vk", "telegram"}],
+            "suggested_channels": [c for c in suggested_channels if c in {"vk", "telegram", "bitrix24"}],
             "metadata": metadata or {},
             "source_documents": source_documents or [],
             "enrichment_status": enrichment_status or "rss_only",
