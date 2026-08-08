@@ -1,6 +1,6 @@
 # NEWS BOT
 
-A news automation service that collects fresh RSS items for `TARGET_TOPIC`, translates them, creates short summaries, and publishes them to Telegram and/or VK on a schedule.
+A news automation service that collects fresh RSS items for `TARGET_TOPIC`, translates them, creates short summaries, and publishes them to Telegram, VK, and/or the Bitrix24 News Feed on a schedule.
 
 Russian version: [README.ru.md](README.ru.md)
 
